@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>منظم طلبات التوصيل</title>
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+  <style>
+    body { background: #f0f8ff; font-family: sans-serif; }
+    .header { text-align: center; margin: 20px 0; position: relative; }
+    .scanner-input { margin: 10px auto; width: 300px; display: block; opacity: 0.7; }
+    .controls .form-control, .controls .btn { margin: 5px; }
+    .status-filters { text-align: center; margin-bottom: 15px; }
+    .status-filters .btn { margin: 0 5px; min-width: 100px; }
+    .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
+    .order-card { border-radius: .5rem; border: 1px solid #dee2e6; background: #fff; padding: 15px; position: relative; cursor: grab; }
+    .order-card.cod { border-color: #ffc107; background: #fff8e1; }
+    .card-border { position: absolute; top: 0; right: 0; width: 5px; height: 100%; background: #5a35ff; border-top-right-radius: .5rem; border-bottom-right-radius: .5rem; }
+    .card-border.cod { background: #ffc107; }
+    .order-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .order-info i, .order-info a i { margin-left: 5px; }
+    .order-number { position: absolute; top: 10px; left: 10px; background: #f8f9fa; color: #343a40; padding: 2px 8px; border-radius: .25rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <!-- Audio elements -->
+  <audio id="audioSuccess" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+  <audio id="audioFail" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
+  <div class="container">
+    <div class="header">
+      <h1 class="text-primary">منظم طلبات التوصيل</h1>
+      <input id="scannerInput" class="form-control scanner-input" type="text" placeholder="امسح رقم الطلب هنا" />
+    </div>
+    <div class="row controls">
+      <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls" />
+      <input id="searchInput" class="form-control col-auto" type="text" placeholder="ابحث برقم الطلب أو اسم العميل" />
+      <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
+      <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
+      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
+      <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
+    </div>
+    <div class="status-filters">
+      <button class="btn btn-outline-dark status-btn active" data-status=""><i class="bi bi-list"></i> الكل</button>
+      <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار"><i class="bi bi-hourglass-split"></i> قيد الانتظار</button>
+      <button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل"><i class="bi bi-truck"></i> جاري التوصيل</button>
+      <button class="btn btn-outline-success status-btn" data-status="تم التوصيل"><i class="bi bi-check-lg"></i> تم التوصيل</button>
+      <button class="btn btn-outline-info status-btn" data-status="مؤجل"><i class="bi bi-pause-circle"></i> مؤجل</button>
+      <button class="btn btn-outline-danger status-btn" data-status="مرفوض"><i class="bi bi-x-circle"></i> مرفوض</button>
+    </div>
+    <div id="ordersContainer" class="order-grid mb-4"></div>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+  <script>
+    let orders = [], sortable = null, filterStatus = '';
+
+    const cashOnDelivery = 'دفع عند الإستلام';
+    const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
+    const messages = {
+      shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
+      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
+    };
+
+    function playSuccess() {
+      document.getElementById('audioSuccess').play().catch(()=>{});
+    }
+    function playFail() {
+      document.getElementById('audioFail').play().catch(()=>{});
+    }
+
+    function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
+    function load(){ const d=localStorage.getItem('ordersData'); if(d){orders=JSON.parse(d);render();}}
+
+    function render(){
+      const cont=document.getElementById('ordersContainer'); cont.innerHTML='';
+      let list=orders.slice();
+      if(filterStatus) list=list.filter(o=>o.status===filterStatus);
+      const q=document.getElementById('searchInput').value.trim().toLowerCase();
+      if(q) list=list.filter(o=> o['رقم الطلب'].toString().includes(q) || o['اسم العميل'].toLowerCase().includes(q) );
+      list.forEach((o,i)=>{
+        const num=o.manualOrder||i+1; const tel=o['رقم الجوال'].replace(/\D/g,''); const cod=o['طريقة الدفع']===cashOnDelivery;
+        const card=document.createElement('div'); card.className='order-card position-relative'+(cod?' cod':''); card.setAttribute('data-id',o['رقم الطلب']);
+        card.innerHTML=`
+          <span class="order-number">${num}</span>
+          <div class="card-border${cod?' cod':''}"></div>
+          <div class="d-flex justify-content-between align-items-center mb-2"><strong>#${o['رقم الطلب']}</strong>${cod?`<span class="badge bg-warning text-dark">عند الإستلام: ${o['إجمالي الطلب']} ريال</span>`:''}</div>
+          <h5>${o['اسم العميل']}</h5>
+          <p class="order-info mb-1"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']}</p>
+          <div class="d-flex mb-2"><a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a><a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm btn-wa"><i class="bi bi-whatsapp"></i></a></div>
+          <div class="d-flex justify-content-between align-items-center"><select class="form-select form-select-sm status-select" style="width:auto;">${statuses.map(s=>`<option value="${s}" ${s===o.status?'selected':''}>${s}</option>`).join('')}</select><input type="number" class="form-control form-control-sm order-input" style="width:60px;margin-left:10px;" min="1" value="${num}"></div>`;
+        card.querySelector('.status-select').addEventListener('change',e=>{o.status=e.target.value;save();render();});
+        card.querySelector('.order-input').addEventListener('change',e=>{o.manualOrder=parseInt(e.target.value)||1;save();});
+        cont.appendChild(card);
+      });
+      if(!sortable) initSortable();
+    }
+
+    function initSortable(){
+      sortable=Sortable.create(document.getElementById('ordersContainer'),{animation:150,disabled:true,onEnd:()=>{
+        const ids=Array.from(document.querySelectorAll('.order-card')).map(el=>el.getAttribute('data-id'));
+        orders=ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));save();render();
+      }});
+    }
+
+    // Barcode scanning (using FileReader.readAsBinaryString for Excel)
+    const scanner=document.getElementById('scannerInput');
+    window.addEventListener('load',()=>scanner.focus());
+    scanner.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();const code=scanner.value.trim();scanner.value='';const ord=orders.find(o=>o['رقم الطلب'].toString()===code);if(ord&&ord.status==='قيد الانتظار'){ord.status='جاري التوصيل';save();render();playSuccess();}else{playFail();alert('الطلب غير موجود أو ليس في حالة "قيد الانتظار".');}}
+    });
+
+    document.getElementById('fileInput').addEventListener('change',function(e){
+      const f=this.files[0];if(!f)return;const reader=new FileReader();reader.onload=evt=>{try{const wb=XLSX.read(evt.target.result,{type:'binary'});processWorkbook(wb);}catch{alert('فشل في قراءة ملف الـExcel.');}};reader.readAsBinaryString(f);
+    });
+
+    function processWorkbook(wb){
+      try{const ws=wb.Sheets[wb.SheetNames[0]];orders=XLSX.utils.sheet_to_json(ws,{defval:''}).map(r=>({...r,status:'قيد الانتظار',manualOrder:null}));save();render();}catch{alert('فشل في معالجة ملف الـExcel.');}
+    }
+
+    document.getElementById('searchInput').addEventListener('input',render);
+    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click',()=>{
+      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      filterStatus=btn.getAttribute('data-status');
+      render();
+    }));
+
+    document.getElementById('manualSortBtn').addEventListener('click',()=>{
+      sortable.option('disabled',!sortable.option('disabled'));
+      document.getElementById('manualSortBtn').textContent=sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+    });
+
+    document.getElementById('applyNumberBtn').addEventListener('click',()=>{
+      orders.sort((a,b)=>(a.manualOrder||0)-(b.manualOrder||0));
+      save();render();
+    });
+
+    document.getElementById('exportBtn').addEventListener('click',()=>{
+      if(!orders.length)return alert('لا توجد بيانات للتصدير');
+      const data=orders.map(o=>({'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''}));
+      const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');XLSX.writeFile(wb,'Orders_export.xlsx');
+    });
+
+    document.getElementById('resetOrderBtn').addEventListener('click',()=>{localStorage.removeItem('ordersData');location.reload();});
+    document.getElementById('clearStorage').addEventListener('click',()=>{localStorage.removeItem('ordersData');orders=[];render();});
+
+    window.addEventListener('load',load);
+  </script>
+</body>
+</html>
