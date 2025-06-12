@@ -49,10 +49,13 @@
 </head>
 <body>
 
-  <!-- قالب بوليصة الشحن مع شعار -->
+  <!-- قالب بوليصة الشحن مع الشعار مضمنًا -->
   <template id="labelTemplate">
     <div class="label">
-      <img src="logo.png" alt="شعار واحة التقنية" class="label-logo">
+      <!-- الشعار هنا مضمّن كـBase64 -->
+      <img class="label-logo"
+           src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEsCAYAAAA7Ldc6AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAFLWlUWH...' 
+           alt="شعار واحة التقنية">
       <div class="header">
         <div class="cod-box">
           <div class="title">الدفع عند الاستلام</div>
@@ -109,7 +112,6 @@
 
   <script>
     let orders = [], sortable = null, filterStatus = '';
-
     const cashOnDelivery = 'دفع عند الإستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const messages = {
@@ -124,13 +126,10 @@
       const cont = document.getElementById('ordersContainer');
       cont.innerHTML = '';
       let list = orders.slice();
-      if(filterStatus) list = list.filter(o => o.status === filterStatus);
+      if(filterStatus) list = list.filter(o => o.status===filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q) {
-        list = list.filter(o =>
-          o['رقم الطلب'].toString().includes(q) ||
-          o['اسم العميل'].toLowerCase().includes(q)
-        );
+      if(q){
+        list = list.filter(o=>o['رقم الطلب'].toString().includes(q)||o['اسم العميل'].toLowerCase().includes(q));
       }
       list.forEach((o,i)=>{
         const num = o.manualOrder||i+1;
@@ -171,8 +170,7 @@
     }
 
     function initSortable(){
-      sortable = Sortable.create(document.getElementById('ordersContainer'), {
-        animation:150, disabled:true,
+      sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
         onEnd: ()=>{
           const ids = Array.from(document.querySelectorAll('.order-card'))
             .map(c=>c.getAttribute('data-id'));
