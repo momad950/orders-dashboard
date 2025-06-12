@@ -63,10 +63,11 @@
         <div class="line"><strong>العنوان:</strong> <span data-address></span></div>
       </div>
       <div class="codes">
-        <div class="qrcode-area" id="qr"></div>
+        <!-- الباركود ثم الـ QR بجانبه -->
         <div class="barcode-area">
           <svg class="jsbarcode" jsbarcode-format="CODE128" jsbarcode-textmargin="0" jsbarcode-height="35" jsbarcode-width="2"></svg>
         </div>
+        <div class="qrcode-area" id="qr"></div>
       </div>
     </div>
   </template>
@@ -82,6 +83,7 @@
       <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
       <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
       <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <button id="selectAllBtn" class="btn btn-outline-secondary btn-sm col-auto">تحديد الكل</button>
       <button id="printSelectedBtn" class="btn btn-outline-primary btn-sm col-auto">طباعة بوليصات مختارة</button>
       <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
@@ -99,6 +101,7 @@
 
   <script>
     let orders = [], sortable = null, filterStatus = '';
+
     const cashOnDelivery = 'دفع عند الإستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const messages = {
@@ -106,18 +109,21 @@
       arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
 
-    function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
-    function load(){ const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }}
+    function save() { localStorage.setItem('ordersData', JSON.stringify(orders)); }
+    function load() { const d = localStorage.getItem('ordersData'); if (d) { orders = JSON.parse(d); render(); } }
 
-    function render(){
-      const cont = document.getElementById('ordersContainer'); cont.innerHTML = '';
-      let list = [...orders];
-      if(filterStatus) list = list.filter(o => o.status === filterStatus);
+    function render() {
+      const cont = document.getElementById('ordersContainer');
+      cont.innerHTML = '';
+      let list = orders.slice();
+      if (filterStatus) list = list.filter(o => o.status === filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q) list = list.filter(o =>
-        o['رقم الطلب'].toString().includes(q) ||
-        o['اسم العميل'].toLowerCase().includes(q)
-      );
+      if (q) {
+        list = list.filter(o =>
+          o['رقم الطلب'].toString().includes(q) ||
+          o['اسم العميل'].toLowerCase().includes(q)
+        );
+      }
       list.forEach((o,i) => {
         const num = o.manualOrder || i+1;
         const tel = o['رقم الجوال'].replace(/\D/g,'');
@@ -148,19 +154,28 @@
             <input type="number" class="form-control form-control-sm order-input" style="width:60px;margin-left:10px;" min="1" value="${num}">
           </div>`;
         cont.appendChild(card);
-        card.querySelector('.status-select').addEventListener('change', e => { o.status=e.target.value; save(); render(); });
-        card.querySelector('.order-input').addEventListener('change', e => { o.manualOrder=parseInt(e.target.value)||1; save(); });
-        card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+
+        card.querySelector('.status-select').addEventListener('change', e => {
+          o.status = e.target.value;
+          save(); render();
+        });
+        card.querySelector('.order-input').addEventListener('change', e => {
+          o.manualOrder = parseInt(e.target.value) || 1;
+          save();
+        });
+        card.querySelector('.btn-print-label').addEventListener('click', () => generateLabel(o));
       });
-      if(!sortable) initSortable();
+      if (!sortable) initSortable();
     }
 
     function initSortable(){
       sortable = Sortable.create(document.getElementById('ordersContainer'), {
         animation:150, disabled:true,
-        onEnd: ()=> {
-          const ids = Array.from(document.querySelectorAll('.order-card')).map(c=>c.getAttribute('data-id'));
-          orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id)); save(); render();
+        onEnd: ()=>{
+          const ids = Array.from(document.querySelectorAll('.order-card'))
+            .map(c=>c.getAttribute('data-id'));
+          orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
+          save(); render();
         }
       });
     }
@@ -168,17 +183,21 @@
     function generateLabel(o){
       const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
       tpl.querySelector('[data-name]').textContent = o['اسم العميل'];
-      tpl.querySelector('[data-id]').textContent = o['رقم الطلب'];
-      tpl.querySelector('[data-phone]').textContent = o['رقم الجوال'];
+      tpl.querySelector('[data-id]').textContent   = o['رقم الطلب'];
+      tpl.querySelector('[data-phone]').textContent= o['رقم الجوال'];
       tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
-      tpl.querySelector('[data-cod]').textContent = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
+      tpl.querySelector('[data-cod]').textContent   = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
       const win = window.open('','_blank');
-      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليسة شحن</title>');
+      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
       win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
       win.document.body.appendChild(tpl); win.document.close();
-      setTimeout(()=>{ win.JsBarcode(win.document.querySelector('.jsbarcode')).init();
-        new win.QRCode(win.document.getElementById('qr'),{text:o['رقم الطلب'],width:100,height:100,correctLevel:win.QRCode.CorrectLevel.H});
-        win.print(); },300);
+      setTimeout(()=>{
+        win.JsBarcode(win.document.querySelector('.jsbarcode')).init();
+        new win.QRCode(win.document.getElementById('qr'), {
+          text: o['رقم الطلب'], width:100, height:100, correctLevel: win.QRCode.CorrectLevel.H
+        });
+        win.print();
+      },300);
     }
 
     function printSelectedLabels(){
@@ -191,61 +210,84 @@
       ids.forEach(id=>{
         const o = orders.find(x=>x['رقم الطلب'].toString()===id);
         const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
-        tpl.querySelector('[data-name]').textContent=o['اسم العميل'];
-        tpl.querySelector('[data-id]').textContent=o['رقم الطلب'];
-        tpl.querySelector('[data-phone]').textContent=o['رقم الجوال'];
-        tpl.querySelector('[data-address]').textContent=o['عنوان العميل'];
-        tpl.querySelector('[data-cod]').textContent=o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
+        tpl.querySelector('[data-name]').textContent    = o['اسم العميل'];
+        tpl.querySelector('[data-id]').textContent      = o['رقم الطلب'];
+        tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
+        tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
+        tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
         win.document.body.appendChild(tpl);
       });
       win.document.write('</body></html>'); win.document.close();
       setTimeout(()=>{
         win.document.querySelectorAll('.jsbarcode').forEach(svg=>JsBarcode(svg).init());
         win.document.querySelectorAll('.qrcode-area').forEach(el=>
-          new win.QRCode(el,{text:el.closest('.label').querySelector('[data-id]').textContent,width:100,height:100,correctLevel:win.QRCode.CorrectLevel.H})
+          new win.QRCode(el, {
+            text: el.closest('.label').querySelector('[data-id]').textContent,
+            width:100, height:100, correctLevel: win.QRCode.CorrectLevel.H
+          })
         );
         win.print();
       },300);
     }
 
-    document.getElementById('fileInput').addEventListener('change',function(){
-      const f=this.files[0]; if(!f)return;
+    document.getElementById('fileInput').addEventListener('change', function(){
+      const f=this.files[0]; if(!f) return;
       const r=new FileReader();
-      r.onload=evt=>{
-        const wb=XLSX.read(evt.target.result,{type:'binary'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        orders = XLSX.utils.sheet_to_json(ws,{defval:''})
-          .map(r=>({...r,status:'قيد الانتظار',manualOrder:null}));
+      r.onload = evt => {
+        const wb = XLSX.read(evt.target.result, {type:'binary'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        orders = XLSX.utils.sheet_to_json(ws, {defval:''})
+          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         save(); render();
-      }; r.readAsBinaryString(f);
+      };
+      r.readAsBinaryString(f);
     });
 
-    document.getElementById('searchInput').addEventListener('input',render);
-    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click',()=>{
-      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); filterStatus=btn.getAttribute('data-status'); render();
-    }));
-    document.getElementById('manualSortBtn').addEventListener('click',()=>{
-      sortable.option('disabled',!sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+    document.getElementById('searchInput').addEventListener('input', render);
+    document.querySelectorAll('.status-btn').forEach(btn=>
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        filterStatus = btn.getAttribute('data-status');
+        render();
+      })
+    );
+
+    document.getElementById('manualSortBtn').addEventListener('click', ()=>{
+      sortable.option('disabled', !sortable.option('disabled'));
+      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')
+        ? 'تمكين الترتيب اليدوي' : 'تعطيل الترتيب اليدوي';
     });
-    document.getElementById('applyNumberBtn').addEventListener('click',()=>{
-      orders.sort((a,b)=>(a.manualOrder||0)-(b.manualOrder||0)); save(); render();
+
+    document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
+      orders.sort((a,b)=>(a.manualOrder||0)-(b.manualOrder||0));
+      save(); render();
     });
-    document.getElementById('exportBtn').addEventListener('click',()=>{
-      if(!orders.length)return alert('لا توجد بيانات للتصدير');
-      const data=orders.map(o=>({
-        'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],
-        'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
+
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      if(!orders.length) return alert('لا توجد بيانات للتصدير');
+      const data = orders.map(o=>({
+        'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],
+        'رقم الجوال':o['رقم الجوال'],'عنوان العميل':o['عنوان العميل'],
+        'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
         'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
       }));
-      const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,'Orders'); XLSX.writeFile(wb,'Orders_export.xlsx');
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+      XLSX.writeFile(wb, 'Orders_export.xlsx');
     });
-    document.getElementById('printSelectedBtn').addEventListener('click',printSelectedLabels);
-    document.getElementById('resetOrderBtn').addEventListener('click',()=>{localStorage.removeItem('ordersData');location.reload();});
-    document.getElementById('clearStorage').addEventListener('click',()=>{localStorage.removeItem('ordersData');orders=[];render();});
-    window.addEventListener('load',load);
+
+    document.getElementById('selectAllBtn').addEventListener('click', ()=>{
+      const boxes = Array.from(document.querySelectorAll('.select-label'));
+      const anyUnchecked = boxes.some(cb=>!cb.checked);
+      boxes.forEach(cb=>cb.checked = anyUnchecked);
+    });
+
+    document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
+    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
+    document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
+    window.addEventListener('load', load);
   </script>
 </body>
 </html>
