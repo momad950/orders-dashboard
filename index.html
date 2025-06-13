@@ -14,102 +14,86 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <style>
-    /* ===================== ستايلات الصفحة الأساسية ===================== */
+    /* ======= ستايلات الصفحة ======= */
     body { background: #f0f8ff; font-family: sans-serif; }
-    .header { text-align: center; margin: 20px 0; position: relative; }
-    .scanner-input { display: block; margin: 10px auto; width: 300px; opacity: .7; }
-    .controls .form-control, .controls .btn { margin: 5px; }
-    .status-filters { text-align: center; margin-bottom: 15px; }
-    .status-filters .btn { margin: 0 5px; min-width: 100px; }
+    .header { text-align:center; margin:20px 0; }
+    .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
+    .controls .form-control, .controls .btn { margin:5px; }
+    .status-filters { text-align:center; margin-bottom:15px; }
+    .status-filters .btn { margin:0 5px; min-width:100px; }
     .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
-    .order-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-    .order-card { border-radius: .5rem; border: 1px solid #dee2e6; background: #fff; padding: 15px; position: relative; cursor: grab; }
-    .order-card.cod { background: #fff8e1; border-color: #ffc107; }
-    .card-border { position: absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
-    .card-border.cod { background:#ffc107; }
+    .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+    .order-card { position:relative; background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; }
+    .order-card.cod { background:#fff8e1; border-color:#ffc107; }
+    .card-border { position:absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
+    .card-border.cod { background:#ffc107 }
+    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-size:.85rem; }
     .order-info i { margin-left:5px; }
-    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-size:.9rem; }
 
-    /* ======== حجم صفحة الطباعة ======== */
+    /* ===== صفحة الطباعة ===== */
     @page { size:95mm 145mm; margin:0; }
 
-    /* ===================== بوليصة الشحن ===================== */
+    /* ======= بوليصة الشحن ======= */
     .label {
-      width: 95mm;
-      height: 145mm;
-      padding: 3mm;
-      box-sizing: border-box;
-      border: 2px solid #000;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      width:95mm; height:145mm;
+      padding:3mm; box-sizing:border-box;
+      border:2px solid #000;
+      display:flex; flex-direction:column; justify-content:space-between;
     }
     .label-logo {
-      display: block;
-      max-width: 40mm;
-      margin: 0 auto 2mm;
-      height: auto;
+      display:block; max-width:40mm; margin:0 auto 2mm; height:auto;
     }
     .label .header,
     .label .codes {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display:flex; justify-content:space-between; align-items:center;
     }
     .label .company-info,
     .label .info-box {
-      border: 1px solid #000;
-      padding: 2mm;
+      border:1px solid #000; padding:2mm;
     }
-    .label .info-box { margin: 2mm 0; }
-    .label .info-box .line { margin-bottom: 1mm; }
+    .label .info-box { margin:2mm 0; }
+    .label .info-box .line { margin-bottom:1mm; /* مسافة تحت كل سطر */ }
     .label .cod-box {
-      display: flex;
-      flex-direction: column;
-      width: 30mm;
-      height: 20mm;
-      text-align: center;
-      border: 1px solid #000;
+      display:flex; flex-direction:column;
+      width:30mm; height:20mm;
+      text-align:center; border:1px solid #000;
     }
     .label .cod-box .title,
     .label .cod-box .amount {
-      flex: 1;
-      line-height: 10mm;
+      flex:1; line-height:10mm;
     }
     .label .cod-box .amount {
-      background: #000;
-      color: #fff;
+      background:#000; color:#fff;
     }
-    .label .codes { margin-top: 4mm; }
-    .label .barcode-wrapper { text-align: center; }
-    .label .barcode-wrapper svg { width: 60mm; height: auto; }
+    .label .codes {
+      margin-top:4mm;
+      gap:5mm;           /* مسافة بين QR والباركود */
+    }
+    .label .barcode-wrapper { text-align:center; }
+    .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text {
-      margin-top: 1mm;
-      font-size: 12pt;
+      margin-top:1mm; font-size:12pt;
+      /* نص الباركود الرئيسي يبقى وزن عادي */
     }
-    .label .qrcode-area {
-      width: 28mm;
-      height: 28mm;
-    }
+    .label .qrcode-area { width:28mm; height:28mm; }
 
-    /* زيادة ثخانة النص الفرعي داخل البوليصة */
-    .label .info-box .line,
+    /* زيادة ثخانة النص الفرعي داخل البوليصة فقط */
+    .label .info-box .line span,
     .label .company-info,
     .label .cod-box .title,
-    .label .cod-box .amount,
-    .label .barcode-text {
-      font-weight: 600;
+    .label .cod-box .amount {
+      font-weight:600;
     }
   </style>
 </head>
 <body>
 
-  <!-- قالب بوليصة الشحن مع الشعار مضمن كـ Base64 -->
+  <!-- قالب بوليصة الشحن -->
   <template id="labelTemplate">
     <div class="label">
-      <img class="label-logo"
-           src="data:image/png;base64,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
-           alt="شعار واحة التقنية">
+      <!-- مسار اللوجو الآن logo.png في المستودع -->
+      <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
+
       <div class="header">
         <div class="cod-box">
           <div class="title">الدفع عند الاستلام</div>
@@ -121,12 +105,14 @@
           <div>جوال: 0506071823</div>
         </div>
       </div>
+
       <div class="info-box">
         <div class="line"><strong>العميل:</strong> <span data-name></span></div>
         <div class="line"><strong>رقم الطلب:</strong> <span data-id></span></div>
         <div class="line"><strong>جوال:</strong> <span data-phone></span></div>
         <div class="line"><strong>العنوان:</strong> <span data-address></span></div>
       </div>
+
       <div class="codes">
         <div class="barcode-wrapper">
           <svg class="jsbarcode"></svg>
@@ -142,6 +128,7 @@
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
+
     <div class="row controls">
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
@@ -153,6 +140,7 @@
       <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
+
     <div class="status-filters mb-3">
       <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
       <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
@@ -161,10 +149,12 @@
       <button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
       <button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
     </div>
+
     <div id="ordersContainer" class="order-grid mb-4"></div>
   </div>
 
   <script>
+    // ——————————————————————————————————————————————————————————————————————
     let orders = [], sortable = null, filterStatus = '';
     const cashOnDelivery = 'دفع عند الإستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
@@ -182,12 +172,10 @@
       let list = orders.slice();
       if(filterStatus) list = list.filter(o=>o.status===filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q){
-        list = list.filter(o=>
-          o['رقم الطلب'].toString().includes(q) ||
-          o['اسم العميل'].toLowerCase().includes(q)
-        );
-      }
+      if(q) list = list.filter(o=>
+        o['رقم الطلب'].toString().includes(q) ||
+        o['اسم العميل'].toLowerCase().includes(q)
+      );
       list.forEach((o,i)=>{
         const num = o.manualOrder||i+1;
         const tel = o['رقم الجوال'].replace(/\D/g,'');
@@ -219,6 +207,7 @@
           </div>`;
         cont.appendChild(card);
 
+        // أحداث التغيير
         card.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
         card.querySelector('.order-input').addEventListener('change', e=>{ o.manualOrder=parseInt(e.target.value)||1; save(); });
         card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
@@ -227,7 +216,8 @@
     }
 
     function initSortable(){
-      sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
+      sortable = Sortable.create(document.getElementById('ordersContainer'), {
+        animation:150, disabled:true,
         onEnd: ()=>{
           const ids = Array.from(document.querySelectorAll('.order-card'))
             .map(c=>c.getAttribute('data-id'));
@@ -291,7 +281,7 @@
       setTimeout(()=>win.print(),300);
     }
 
-    // الأحداث الأساسية
+    // الأحداث
     document.getElementById('fileInput').addEventListener('change', function(){
       const f=this.files[0]; if(!f) return;
       const r=new FileReader(); r.onload=evt=>{
@@ -303,20 +293,23 @@
       }; r.readAsBinaryString(f);
     });
     document.getElementById('searchInput').addEventListener('input', render);
-    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      filterStatus = btn.getAttribute('data-status');
-      render();
-    }));
+    document.querySelectorAll('.status-btn').forEach(btn=>
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        filterStatus = btn.getAttribute('data-status');
+        render();
+      })
+    );
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
-      sortable.option('disabled', !sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent =
-        sortable.option('disabled') ? 'تعطيل الترتيب اليدوي' : 'تمكين الترتيب اليدوي';
+      const disabled = !sortable.option('disabled');
+      sortable.option('disabled', disabled);
+      document.getElementById('manualSortBtn').textContent = disabled
+        ? 'تعطيل الترتيب اليدوي'
+        : 'تمكين الترتيب اليدوي';
     });
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
-      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0));
-      save(); render();
+      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0)); save(); render();
     });
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
@@ -335,15 +328,5 @@
       boxes.forEach(cb=>cb.checked=anyUnchecked);
     });
     document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
-    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{
-      localStorage.removeItem('ordersData');
-      location.reload();
-    });
-    document.getElementById('clearStorage').addEventListener('click', ()=>{
-      localStorage.removeItem('ordersData');
-      orders=[]; render();
-    });
-    window.addEventListener('load', load);
-  </script>
-</body>
-</html>
+    document.getElementById('resetOrderBtn').addEventListener
+
