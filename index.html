@@ -239,67 +239,37 @@
 
     function initSortable(){ sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true, onEnd: ()=>{ const ids = Array.from(document.querySelectorAll('.order-card')).map(c=>c.getAttribute('data-id')); orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id)); save(); render(); } }); }
 
-    function generateLabel(o){ /* remains unchanged */ }
-    function printSelectedLabels(){ /* remains unchanged */ }
+    function generateLabel(o){
+      // Clone template and fill data
+      const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
+      tpl.querySelector('[data-cod]').textContent = o['طريقة الدفع']===cashOnDelivery? o['إجمالي الطلب'] : '';
+      tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
+      tpl.querySelector('[data-id]').textContent = o['رقم الطلب'];
+      tpl.querySelector('[data-name]').textContent = o['اسم العميل'];
+      tpl.querySelector('[data-phone]').textContent = o['رقم الجوال'];
+      tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
+      // Barcode
+      JsBarcode(tpl.querySelector('.jsbarcode'), o['رقم الطلب'], { format: 'CODE128', displayValue: false });
+      // QR Code
+      new QRCode(tpl.querySelector('[data-qr]'), { text: o['رقم الطلب'], width: 112, height: 112 });
+      // Open print window
+      const printWin = window.open('', '_blank');
+      printWin.document.write('<html><head><title>بوليصة #'+o['رقم الطلب']+'</title><style>@page{margin:0;}body{margin:0;}</style></head><body>' + tpl.firstElementChild.outerHTML + '</body></html>');
+      printWin.document.close();
+      printWin.focus();
+      printWin.print();
+      setTimeout(() => printWin.close(), 500);
+    }
 
-    // إضافة حدث حفظ طلب جديد
-    document.getElementById('saveOrderBtn').addEventListener('click', ()=>{
-      const form = document.getElementById('addOrderForm'); if(!form.checkValidity()) return form.reportValidity();
-      const data = new FormData(form);
-      const newOrder = {
-        'رقم الطلب': data.get('id'),
-        'اسم العميل': data.get('name'),
-        'رقم الجوال': data.get('phone'),
-        'عنوان العميل': data.get('address'),
-        'طريقة الدفع': data.get('payment'),
-        'إجمالي الطلب': data.get('total'),
-        note: data.get('note') || '',
-        status: 'قيد الانتظار',
-        manualOrder: null
-      };
-      orders.push(newOrder); save(); render();
-      var modal = bootstrap.Modal.getInstance(document.getElementById('addOrderModal'));
-      modal.hide(); form.reset();
-    });
+    function printSelectedLabels(){
+      document.querySelectorAll('.select-label:checked').forEach(cb=>{
+        const id = cb.closest('.order-card').getAttribute('data-id');
+        const order = orders.find(o=>o['رقم الطلب']==id);
+        if(order) generateLabel(order);
+      });
+    }
 
-    // باقي الأحداث كما كان
-    document.getElementById('fileInput').addEventListener('change', function(e){
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = function(evt){
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const ws = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        orders = json.map(o => ({
-          'رقم الطلب': o['رقم الطلب'] || o['Order Number'] || o['id'] || '',
-          'اسم العميل': o['اسم العميل'] || o['Customer Name'] || '',
-          'رقم الجوال': o['رقم الجوال'] || o['Phone'] || '',
-          'عنوان العميل': o['عنوان العميل'] || o['Address'] || '',
-          'طريقة الدفع': o['طريقة الدفع'] || o['Payment'] || '',
-          'إجمالي الطلب': o['إجمالي الطلب'] || o['Total'] || '',
-          note: o['ملاحظة'] || '',
-          status: 'قيد الانتظار',
-          manualOrder: null
-        }));
-        save(); render();
-      };
-      reader.readAsArrayBuffer(file);
-    });
-    document.getElementById('searchInput').addEventListener('input', render);
-    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{ document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); filterStatus=btn.getAttribute('data-status'); render(); }));
-    document.getElementById('manualSortBtn').addEventListener('click', ()=>{ sortable.option('disabled',!sortable.option('disabled')); document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي'; });
-    document.getElementById('applyNumberBtn').addEventListener('click', ()=>{ orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0)); save(); render(); });
-    document.getElementById('exportBtn').addEventListener('click', ()=>{
-      if(!orders.length) return alert('لا توجد بيانات للتصدير');
-      const data = orders.map(o=>({ 'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],'ملاحظة':o.note,'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||'' }));
-      const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Orders'); XLSX.writeFile(wb,'Orders_export.xlsx');
-    });
-    document.getElementById('selectAllBtn').addEventListener('click', ()=>{ const boxes=Array.from(document.querySelectorAll('.select-label')); const anyUnchecked=boxes.some(cb=>!cb.checked); boxes.forEach(cb=>cb.checked=anyUnchecked); });
-    document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
-    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
-    document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
+    // باقي الأحداث
     window.addEventListener('load', load);
   </script>
 </body>
