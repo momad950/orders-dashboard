@@ -12,7 +12,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-   <style>
+
+  <style>
+    /* ======= ستايلات الصفحة ======= */
     body { background: #f0f8ff; font-family: sans-serif; }
     .header { text-align:center; margin:20px 0; }
     .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
@@ -21,61 +23,74 @@
     .status-filters .btn { margin:0 5px; min-width:100px; }
     .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
-    .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
+    .order-card { position:relative; background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; }
     .order-card.cod { background:#fff8e1; border-color:#ffc107; }
     .card-border { position:absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
-    .card-border.cod { background:#ffc107; }
-    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; }
-    .select-label { position:absolute; top:10px; right:10px; z-index:10; }
+    .card-border.cod { background:#ffc107 }
+    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-size:.85rem; }
     .order-info i { margin-left:5px; }
+
+    /* ===== صفحة الطباعة ===== */
     @page { size:95mm 145mm; margin:0; }
 
-    /* بوليصة الشحن */
+    /* ======= بوليصة الشحن ======= */
     .label {
-      width:95mm;
-      height:145mm;
-      padding:3mm;
-      box-sizing:border-box;
+      width:95mm; height:145mm;
+      padding:3mm; box-sizing:border-box;
       border:2px solid #000;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      font-weight: 600;           /* سماكة متوسطة لكل النصوص */
+      display:flex; flex-direction:column; justify-content:space-between;
     }
-    .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
-    .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
-    .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
+    .label-logo {
+      display:block; max-width:40mm; margin:0 auto 2mm; height:auto;
+    }
+    .label .header,
+    .label .codes {
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .label .company-info,
+    .label .info-box {
+      border:1px solid #000; padding:2mm;
+    }
     .label .info-box { margin:2mm 0; }
     .label .info-box .line { margin-bottom:1mm; }
-    .label .cod-box { display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000; }
-    .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
-    .label .cod-box .amount { background:#000; color:#fff; font-weight:700; }
-    .label .codes { margin-top:4mm; }
+    .label .cod-box {
+      display:flex; flex-direction:column;
+      width:30mm; height:20mm;
+      text-align:center; border:1px solid #000;
+    }
+    .label .cod-box .title,
+    .label .cod-box .amount {
+      flex:1; line-height:10mm;
+    }
+    .label .cod-box .amount {
+      background:#000; color:#fff;
+    }
+    .label .codes {
+      margin-top:4mm;
+      display:flex; gap:5mm; /* مسافة بين الباركود وQR */
+    }
     .label .barcode-wrapper { text-align:center; }
     .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text {
-      margin-top:1mm;
-      font-size:12pt;
-      font-weight:700;           /* زيادة ثخانة نص الباركود */
+      margin-top:1mm; font-size:12pt;
     }
     .label .qrcode-area { width:28mm; height:28mm; }
 
-    /* نصوص معينة أكثر ثخانة */
+    /* ثخانة النص الفرعي فقط داخل البوليصة */
+    .label .info-box .line span,
     .label .company-info,
-    .label .info-box .line,
-    .label .cod-box .title {
-      font-weight:700;           /* سماكة عالية للعناوين */
+    .label .cod-box .title,
+    .label .cod-box .amount {
+      font-weight:600;
     }
   </style>
 </head>
 <body>
 
-  <!-- قالب بوليصة الشحن مع الشعار من ملف logo.png -->
+  <!-- قالب بوليصة الشحن -->
   <template id="labelTemplate">
     <div class="label">
-      <img class="label-logo"
-           src="logo.png"
-           alt="شعار واحة التقنية">
+      <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
       <div class="header">
         <div class="cod-box">
           <div class="title">الدفع عند الاستلام</div>
@@ -108,6 +123,7 @@
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
+
     <div class="row controls">
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
@@ -119,6 +135,7 @@
       <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
+
     <div class="status-filters mb-3">
       <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
       <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
@@ -127,6 +144,7 @@
       <button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
       <button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
     </div>
+
     <div id="ordersContainer" class="order-grid mb-4"></div>
   </div>
 
@@ -148,12 +166,10 @@
       let list = orders.slice();
       if(filterStatus) list = list.filter(o=>o.status===filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q){
-        list = list.filter(o=>
-          o['رقم الطلب'].toString().includes(q) ||
-          o['اسم العميل'].toLowerCase().includes(q)
-        );
-      }
+      if(q) list = list.filter(o=>
+        o['رقم الطلب'].toString().includes(q) ||
+        o['اسم العميل'].toLowerCase().includes(q)
+      );
       list.forEach((o,i)=>{
         const num = o.manualOrder||i+1;
         const tel = o['رقم الجوال'].replace(/\D/g,'');
@@ -193,7 +209,8 @@
     }
 
     function initSortable(){
-      sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
+      sortable = Sortable.create(document.getElementById('ordersContainer'), {
+        animation:150, disabled:true,
         onEnd: ()=>{
           const ids = Array.from(document.querySelectorAll('.order-card'))
             .map(c=>c.getAttribute('data-id'));
@@ -211,19 +228,17 @@
       tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
       tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
 
-      // باركود
       const svg = tpl.querySelector('.jsbarcode');
       JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
       tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
 
-      // QR
       new QRCode(tpl.querySelector('[data-qr]'), {
         text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
       });
 
       const win = window.open('','_blank');
-      win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>
-        <style>${document.querySelector('style').innerText}</style></head><body>`);
+      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
       win.document.body.appendChild(tpl);
       win.document.close();
       setTimeout(()=>win.print(),300);
@@ -234,8 +249,8 @@
         .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
-      win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>
-        <style>${document.querySelector('style').innerText}</style></head><body>`);
+      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
       ids.forEach(id=>{
         const o = orders.find(x=>x['رقم الطلب'].toString()===id);
         const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
@@ -257,32 +272,41 @@
       setTimeout(()=>win.print(),300);
     }
 
-    // الأحداث الأساسية
+    // معالجة رفع ملف Excel باستخدام ArrayBuffer
     document.getElementById('fileInput').addEventListener('change', function(){
-      const f=this.files[0]; if(!f) return;
-      const r=new FileReader(); r.onload=evt=>{
-        const wb=XLSX.read(evt.target.result,{type:'binary'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        orders = XLSX.utils.sheet_to_json(ws,{defval:''})
-          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
-        save(); render();
-      }; r.readAsBinaryString(f);
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        orders = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+          .map(r => ({ ...r, status:'قيد الانتظار', manualOrder:null }));
+        save();
+        render();
+      };
+      reader.readAsArrayBuffer(file);
     });
+
     document.getElementById('searchInput').addEventListener('input', render);
-    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      filterStatus = btn.getAttribute('data-status');
-      render();
-    }));
+    document.querySelectorAll('.status-btn').forEach(btn=>
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        filterStatus = btn.getAttribute('data-status');
+        render();
+      })
+    );
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
-      sortable.option('disabled',!sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent =
-        sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+      const disabled = !sortable.option('disabled');
+      sortable.option('disabled', disabled);
+      document.getElementById('manualSortBtn').textContent = disabled
+        ? 'تعطيل الترتيب اليدوي'
+        : 'تمكين الترتيب اليدوي';
     });
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
-      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0));
-      save(); render();
+      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0)); save(); render();
     });
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
@@ -291,18 +315,24 @@
         'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
         'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
       }));
-      const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Orders');
       XLSX.writeFile(wb,'Orders_export.xlsx');
     });
     document.getElementById('selectAllBtn').addEventListener('click', ()=>{
-      const boxes=Array.from(document.querySelectorAll('.select-label'));
-      const anyUnchecked=boxes.some(cb=>!cb.checked);
-      boxes.forEach(cb=>cb.checked=anyUnchecked);
+      const boxes = Array.from(document.querySelectorAll('.select-label'));
+      const anyUnchecked = boxes.some(cb=>!cb.checked);
+      boxes.forEach(cb=>cb.checked = anyUnchecked);
     });
     document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
-    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
-    document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
+    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{
+      localStorage.removeItem('ordersData');
+      location.reload();
+    });
+    document.getElementById('clearStorage').addEventListener('click', ()=>{
+      localStorage.removeItem('ordersData');
+      orders = []; render();
+    });
     window.addEventListener('load', load);
   </script>
 </body>
