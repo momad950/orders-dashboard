@@ -37,7 +37,7 @@
       justify-content:space-between;
     }
     .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
-    .label .header, .label .codes {
+    .label .header {
       display:flex; justify-content:space-between; align-items:center;
     }
     .label .company-info, .label .info-box {
@@ -55,17 +55,25 @@
     .label .cod-box .amount {
       background:#000; color:#fff; font-weight:bold;
     }
-    /* هنا زدنا الهوامش بينهما */
-    .label .codes { margin-top:4mm; padding:0 4mm; }
+
+    /* === التعديل هنا: توسيط الباركود وQR === */
+    .label .codes {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8mm;
+      margin-top: 4mm;
+      padding: 0 4mm;
+    }
     .label .barcode-wrapper {
-      text-align:center; margin-right:8mm;
+      text-align:center;
     }
     .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text {
       margin-top:1mm; font-size:12pt; font-weight:bold;
     }
     .label .qrcode-area {
-      width:28mm; height:28mm; margin-left:8mm;
+      width:28mm; height:28mm;
     }
   </style>
 </head>
@@ -122,7 +130,7 @@
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
 
-    <!-- النافذة المنبثقة لإضافة طلب -->
+    <!-- نافذة إضافة طلب -->
     <div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content text-end">
@@ -178,59 +186,45 @@
     function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
     function load(){ const d=localStorage.getItem('ordersData'); if(d){ orders=JSON.parse(d); render(); }}
 
-    // الماسح: تحديث الحالة
-    document.getElementById('scannerInput')
-      .addEventListener('keydown', e=>{
-        if(e.key==='Enter'){
-          const id=e.target.value.trim();
-          const o=orders.find(x=>x['رقم الطلب'].toString()===id);
-          if(o){
-            o.status='جاري التوصيل';
-            save(); render();
-          } else {
-            alert('رقم الطلب غير موجود');
-          }
-          e.target.value='';
-        }
-      });
+    // ماسح باركود: تغيير الحالة إلى جاري التوصيل
+    document.getElementById('scannerInput').addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ 
+        const id=e.target.value.trim();
+        const o=orders.find(x=>x['رقم الطلب'].toString()===id);
+        if(o){ o.status='جاري التوصيل'; save(); render(); }
+        else alert('رقم الطلب غير موجود');
+        e.target.value='';
+      }
+    });
 
-    // فتح وإضافة طلب جديد
+    // إضافة طلب جديد
     const addModal = new bootstrap.Modal(document.getElementById('addOrderModal'));
     document.getElementById('addOrderBtn').onclick = ()=>addModal.show();
     document.getElementById('saveNewOrder').onclick = ()=>{
       const id=document.getElementById('newId').value.trim();
-      if(!id||orders.find(x=>x['رقم الطلب'].toString()===id)){
-        return alert('الرجاء رقم طلب صحيح وغير مكرر');
-      }
+      if(!id||orders.find(x=>x['رقم الطلب'].toString()===id))
+        return alert('أدخل رقم طلب صحيح وغير مكرر');
       const o={
-        'رقم الطلب': id,
-        'اسم العميل': document.getElementById('newName').value.trim(),
-        'رقم الجوال': document.getElementById('newPhone').value.trim(),
-        'عنوان العميل': document.getElementById('newAddress').value.trim(),
-        'طريقة الدفع': document.getElementById('newPayment').value,
-        'إجمالي الطلب': document.getElementById('newTotal').value,
-        'ملاحظة': document.getElementById('newNote').value.trim(),
+        'رقم الطلب':id,
+        'اسم العميل':document.getElementById('newName').value.trim(),
+        'رقم الجوال':document.getElementById('newPhone').value.trim(),
+        'عنوان العميل':document.getElementById('newAddress').value.trim(),
+        'طريقة الدفع':document.getElementById('newPayment').value,
+        'إجمالي الطلب':document.getElementById('newTotal').value,
+        'ملاحظة':document.getElementById('newNote').value.trim(),
         status:'قيد الانتظار', manualOrder:null
       };
-      orders.unshift(o);
-      save(); render();
-      addModal.hide();
+      orders.unshift(o); save(); render(); addModal.hide();
     };
 
     function render(){
-      const cont = document.getElementById('ordersContainer');
-      cont.innerHTML='';
-      let list = orders.slice();
-      if(filterStatus) list = list.filter(o=>o.status===filterStatus);
+      const cont=document.getElementById('ordersContainer');
+      cont.innerHTML=''; let list=orders.slice();
+      if(filterStatus) list=list.filter(o=>o.status===filterStatus);
       const q=document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q) list=list.filter(o=>
-        o['رقم الطلب'].toString().includes(q)||
-        o['اسم العميل'].toLowerCase().includes(q)
-      );
+      if(q) list=list.filter(o=>o['رقم الطلب'].toString().includes(q)||o['اسم العميل'].toLowerCase().includes(q));
       list.forEach((o,i)=>{
-        const num=o.manualOrder||i+1;
-        const tel=o['رقم الجوال'].replace(/\D/g,'');
-        const cod=o['طريقة الدفع']===cashOnDelivery;
+        const num=o.manualOrder||i+1, tel=o['رقم الجوال'].replace(/\D/g,''), cod=o['طريقة الدفع']===cashOnDelivery;
         const card=document.createElement('div');
         card.className='order-card position-relative'+(cod?' cod':'');
         card.setAttribute('data-id',o['رقم الطلب']);
@@ -255,8 +249,7 @@
             <select class="form-select form-select-sm status-select" style="width:auto;">
               ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
             </select>
-            <input type="number" class="form-control form-control-sm order-input" style="width:60px;margin-left:10px;" min="1" value="${num}">`
-        ;
+            <input type="number" class="form-control form-control-sm order-input" style="width:60px;margin-left:10px;" min="1" value="${num}">`;
         cont.appendChild(card);
         card.querySelector('.status-select').onchange = e=>{ o.status=e.target.value; save(); render(); };
         card.querySelector('.order-input').onchange = e=>{ o.manualOrder=parseInt(e.target.value)||1; save(); };
@@ -269,8 +262,7 @@
       sortable = Sortable.create(document.getElementById('ordersContainer'), {
         animation:150, disabled:true,
         onEnd:()=>{
-          const ids=Array.from(document.querySelectorAll('.order-card'))
-            .map(c=>c.getAttribute('data-id'));
+          const ids=Array.from(document.querySelectorAll('.order-card')).map(c=>c.getAttribute('data-id'));
           orders=ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
           save(); render();
         }
@@ -296,8 +288,7 @@
     }
 
     function printSelectedLabels(){
-      const ids=Array.from(document.querySelectorAll('.select-label:checked'))
-        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+      const ids=Array.from(document.querySelectorAll('.select-label:checked')).map(cb=>cb.closest('.order-card').getAttribute('data-id'));
       if(!ids.length)return alert('لم تختَر أي طلبات للطباعة.');
       const win=window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
@@ -327,8 +318,7 @@
       r.onload=evt=>{
         const wb=XLSX.read(evt.target.result,{type:'binary'});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        orders=XLSX.utils.sheet_to_json(ws,{defval:''})
-          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
+        orders=XLSX.utils.sheet_to_json(ws,{defval:''}).map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         save(); render();
       };
       r.readAsBinaryString(f);
