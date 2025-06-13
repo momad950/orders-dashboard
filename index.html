@@ -263,7 +263,30 @@
     });
 
     // باقي الأحداث كما كان
-    document.getElementById('fileInput').addEventListener('change', function(){ /* unchanged load Excel */ });
+    document.getElementById('fileInput').addEventListener('change', function(e){
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt){
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const ws = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        orders = json.map(o => ({
+          'رقم الطلب': o['رقم الطلب'] || o['Order Number'] || o['id'] || '',
+          'اسم العميل': o['اسم العميل'] || o['Customer Name'] || '',
+          'رقم الجوال': o['رقم الجوال'] || o['Phone'] || '',
+          'عنوان العميل': o['عنوان العميل'] || o['Address'] || '',
+          'طريقة الدفع': o['طريقة الدفع'] || o['Payment'] || '',
+          'إجمالي الطلب': o['إجمالي الطلب'] || o['Total'] || '',
+          note: o['ملاحظة'] || '',
+          status: 'قيد الانتظار',
+          manualOrder: null
+        }));
+        save(); render();
+      };
+      reader.readAsArrayBuffer(file);
+    });
     document.getElementById('searchInput').addEventListener('input', render);
     document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{ document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); filterStatus=btn.getAttribute('data-status'); render(); }));
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{ sortable.option('disabled',!sortable.option('disabled')); document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي'; });
@@ -278,6 +301,9 @@
     document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
     document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
     window.addEventListener('load', load);
+  </script>
+</body>
+</html>('load', load);
   </script>
 </body>
 </html>
