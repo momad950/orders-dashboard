@@ -4,10 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>منظم طلبات التوصيل</title>
-  <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
-  <!-- SheetJS, SortableJS, JsBarcode & QRCode -->
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
@@ -17,26 +15,25 @@
     .header { text-align:center; margin:20px 0; }
     .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
     .controls .form-control, .controls .btn { margin:5px; }
-    .status-filters { text-align:center; margin-bottom:15px; }
-    .status-filters .btn { margin:0 5px; min-width:100px; }
-    .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
     .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
     .order-card.cod { background:#fff8e1; border-color:#ffc107; }
     .card-border { position:absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
     .card-border.cod { background:#ffc107; }
-    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:bold; }
+    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; }
     .select-label { position:absolute; top:10px; right:10px; z-index:10; }
     .order-info i { margin-left:5px; }
+    .status-filters { text-align:center; margin-bottom:15px; }
+    .status-filters .btn { margin:0 5px; min-width:100px; }
+    .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
     @page { size:95mm 145mm; margin:0; }
-
     /* بوليصة الشحن */
     .label { width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; }
     .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
     .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
     .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
     .label .info-box { margin:2mm 0; }
-    .label .info-box .line { margin-bottom:1mm; font-size:13pt; font-weight:500; }
+    .label .info-box .line { margin-bottom:1mm; }
     .label .cod-box { display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000; }
     .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
     .label .cod-box .amount { background:#000; color:#fff; font-weight:bold; }
@@ -52,24 +49,18 @@
     .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
     .label .qrcode-area { width:28mm; height:28mm; }
-
-    /* أزرار التراجع والتقدم */
-    .undo-redo-btns .btn {
-      min-width: 110px;
-      margin-left: 6px;
-    }
-    /* تحسين ترتيب الأزرار */
-    .controls { flex-wrap: wrap; gap: 5px; }
+    /* --- لمسة جمالية للأزرار العليا --- */
+    .toolbar { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; align-items:center; margin-bottom:10px;}
+    .toolbar .btn, .toolbar .form-select { min-width:100px;}
+    .undo-redo-btns { margin:0 8px; }
+    /* --- */
   </style>
 </head>
 <body>
-
   <!-- قالب بوليصة الشحن مع الشعار من المستودع -->
   <template id="labelTemplate">
     <div class="label">
-      <img class="label-logo"
-           src="logo.png"
-           alt="شعار واحة التقنية">
+      <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
       <div class="header">
         <div class="cod-box">
           <div class="title">الدفع عند الاستلام</div>
@@ -86,6 +77,7 @@
         <div class="line"><strong>رقم الطلب:</strong> <span data-id></span></div>
         <div class="line"><strong>جوال:</strong> <span data-phone></span></div>
         <div class="line"><strong>العنوان:</strong> <span data-address></span></div>
+        <div class="line" data-note-line style="display:none"><strong>ملاحظة:</strong> <span data-note></span></div>
       </div>
       <div class="codes">
         <div class="barcode-wrapper">
@@ -102,18 +94,29 @@
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
-    <div class="row controls d-flex align-items-center">
+    <!-- الشريط العلوي للأزرار والميزات -->
+    <div class="toolbar">
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
       <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
       <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
-      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <select id="bulkStatus" class="form-select form-select-sm col-auto" style="width:auto;">
+        <option value="">تغيير حالة الطلبات المحددة</option>
+        <option value="قيد الانتظار">قيد الانتظار</option>
+        <option value="جاري التوصيل">جاري التوصيل</option>
+        <option value="تم التوصيل">تم التوصيل</option>
+        <option value="مؤجل">مؤجل</option>
+        <option value="مرفوض">مرفوض</option>
+      </select>
+      <button id="deleteSelectedBtn" class="btn btn-danger btn-sm col-auto">حذف المحدد</button>
       <button id="selectAllBtn" class="btn btn-outline-secondary btn-sm col-auto">تحديد الكل</button>
       <button id="printSelectedBtn" class="btn btn-outline-primary btn-sm col-auto">طباعة بوليصات مختارة</button>
-      <span class="undo-redo-btns d-inline-block">
-        <button id="undoBtn" class="btn btn-outline-secondary btn-sm">تراجع للخلف</button>
-        <button id="redoBtn" class="btn btn-outline-secondary btn-sm">تقدم للأمام</button>
-      </span>
+      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <button id="addOrderBtn" class="btn btn-warning btn-sm col-auto">إضافة طلب جديد</button>
+      <div class="undo-redo-btns">
+        <button id="undoBtn" class="btn btn-light btn-sm" title="تراجع"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button id="redoBtn" class="btn btn-light btn-sm" title="تقدم"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
     <div class="status-filters mb-3">
@@ -127,10 +130,57 @@
     <div id="ordersContainer" class="order-grid mb-4"></div>
   </div>
 
-  <script>
-    let orders = [], sortable = null, filterStatus = '';
-    let historyStack = [], redoStack = [];
+  <!-- نافذة إضافة طلب جديد -->
+  <div id="addOrderModal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <form id="addOrderForm" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">إضافة طلب جديد</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2"><input required name="رقم الطلب" class="form-control" placeholder="رقم الطلب"></div>
+          <div class="mb-2"><input required name="اسم العميل" class="form-control" placeholder="اسم العميل"></div>
+          <div class="mb-2"><input required name="رقم الجوال" class="form-control" placeholder="رقم الجوال"></div>
+          <div class="mb-2"><input required name="عنوان العميل" class="form-control" placeholder="العنوان"></div>
+          <div class="mb-2"><input required name="طريقة الدفع" class="form-control" placeholder="طريقة الدفع"></div>
+          <div class="mb-2"><input required name="إجمالي الطلب" type="number" class="form-control" placeholder="إجمالي الطلب"></div>
+          <div class="mb-2"><input name="ملاحظة" class="form-control" placeholder="ملاحظة (اختياري)"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">إضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <script>
+    // --- التخزين الاحتياطي للتراجع والتقدم ---
+    let history = [], future = [];
+    function pushHistory() {
+      history.push(JSON.stringify(orders));
+      if (history.length > 50) history.shift();
+      future = [];
+    }
+    function undo() {
+      if (history.length) {
+        future.push(JSON.stringify(orders));
+        orders = JSON.parse(history.pop());
+        save(false);
+        render();
+      }
+    }
+    function redo() {
+      if (future.length) {
+        history.push(JSON.stringify(orders));
+        orders = JSON.parse(future.pop());
+        save(false);
+        render();
+      }
+    }
+
+    // --- بيانات الطلبات والمزايا الرئيسية ---
+    let orders = [], sortable = null, filterStatus = '';
     const cashOnDelivery = 'دفع عند الإستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const messages = {
@@ -138,39 +188,17 @@
       arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
 
-    // history functions
-    function saveHistory() {
-      historyStack.push(JSON.stringify(orders));
-      if (historyStack.length > 50) historyStack.shift();
-      redoStack = [];
+    // --- حفظ وقراءة الطلبات مع إمكانية التراجع ---
+    function save(push=true){
+      localStorage.setItem('ordersData', JSON.stringify(orders));
+      if(push) pushHistory();
     }
-    function undo() {
-      if (historyStack.length > 1) {
-        redoStack.push(JSON.stringify(orders));
-        orders = JSON.parse(historyStack.pop());
-        save();
-        render();
-      }
-    }
-    function redo() {
-      if (redoStack.length) {
-        historyStack.push(JSON.stringify(orders));
-        orders = JSON.parse(redoStack.pop());
-        save();
-        render();
-      }
-    }
-    document.getElementById('undoBtn').addEventListener('click', undo);
-    document.getElementById('redoBtn').addEventListener('click', redo);
-
-    function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
-    function load(){ 
-      const d=localStorage.getItem('ordersData'); 
-      if(d){ orders = JSON.parse(d); }
-      saveHistory();
-      render();
+    function load(){
+      const d=localStorage.getItem('ordersData');
+      if(d){ orders = JSON.parse(d); pushHistory(); render(); }
     }
 
+    // --- عرض الطلبات ---
     function render(){
       const cont = document.getElementById('ordersContainer');
       cont.innerHTML = '';
@@ -183,78 +211,95 @@
           o['اسم العميل'].toLowerCase().includes(q)
         );
       }
+      // ترتيب حسب رقم الترتيب اليدوي أو المضاف
+      list.sort((a,b)=> ((a.manualOrder||a.addedOrder||0) - (b.manualOrder||b.addedOrder||0)));
       list.forEach((o,i)=>{
-        const num = o.manualOrder||i+1;
-        const tel = o['رقم الجوال'] ? o['رقم الجوال'].replace(/\D/g,'') : '';
+        const num = o.manualOrder||o.addedOrder||i+1;
+        const tel = (o['رقم الجوال']||"").replace(/\D/g,'');
         const cod = o['طريقة الدفع']===cashOnDelivery;
         const card = document.createElement('div');
         card.className = 'order-card position-relative'+(cod?' cod':'');
-
         card.setAttribute('data-id', o['رقم الطلب']);
         card.innerHTML = `
           <input type="checkbox" class="form-check-input select-label"/>
-          <span class="order-number">${num}</span>
+          <span class="order-number">
+            <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+          </span>
           <div class="card-border${cod?' cod':''}"></div>
           <div class="d-flex justify-content-between mb-2">
             <strong>#${o['رقم الطلب']}</strong>
             ${cod?`<span class="badge bg-warning text-dark">عند الإستلام: ${o['إجمالي الطلب']} ريال</span>`:''}
           </div>
           <h5>${o['اسم العميل']}</h5>
-          <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']}</p>
+          <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']||''}</p>
+          <div class="mb-2" style="color:#888;">${o['ملاحظة']||''}</div>
           <div class="d-flex mb-2">
             <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
             <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
             <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
             <button class="btn btn-outline-secondary btn-sm ms-2 btn-print-label"><i class="bi bi-printer"></i></button>
+            <button class="btn btn-light btn-sm ms-2 btn-edit-order"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-light btn-sm ms-2 btn-delete-order"><i class="bi bi-trash"></i></button>
           </div>
           <div class="d-flex justify-content-between align-items-center">
             <select class="form-select form-select-sm status-select" style="width:auto;">
               ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
             </select>
-            <input type="number" class="form-control form-control-sm order-input" style="width:60px;margin-left:10px;" min="1" value="${num}">
-          </div>
-        `;
+          </div>`;
         cont.appendChild(card);
 
         card.querySelector('.status-select').addEventListener('change', e=>{
-          saveHistory();
-          o.status=e.target.value; save(); render();
+          o.status=e.target.value; save();
         });
         card.querySelector('.order-input').addEventListener('change', e=>{
-          saveHistory();
-          o.manualOrder=parseInt(e.target.value)||1; save(); render();
+          o.manualOrder=parseInt(e.target.value)||1; save();
         });
         card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+        card.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
+        card.querySelector('.btn-delete-order').addEventListener('click', ()=>{
+          if(confirm("تأكيد حذف الطلب؟")){
+            orders = orders.filter(x=>x!==o); save();
+          }
+        });
       });
       if(!sortable) initSortable();
     }
 
+    // --- السحب والترتيب اليدوي ---
     function initSortable(){
       sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
         onEnd: ()=>{
-          saveHistory();
           const ids = Array.from(document.querySelectorAll('.order-card')).map(c=>c.getAttribute('data-id'));
           orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
-          save(); render();
+          save();
+          render();
         }
       });
     }
 
+    // --- طباعة بوليصة واحدة ---
     function generateLabel(o){
       const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
       tpl.querySelector('[data-name]').textContent    = o['اسم العميل'];
       tpl.querySelector('[data-id]').textContent      = o['رقم الطلب'];
       tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
       tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
+      if(o['ملاحظة']) {
+        tpl.querySelector('[data-note-line]').style.display = '';
+        tpl.querySelector('[data-note]').textContent = o['ملاحظة'];
+      }
       tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
+
       // باركود
       const svg = tpl.querySelector('.jsbarcode');
       JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
       tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
+
       // QR
       new QRCode(tpl.querySelector('[data-qr]'), {
         text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
       });
+
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
       win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
@@ -263,8 +308,10 @@
       setTimeout(()=>win.print(),300);
     }
 
+    // --- طباعة البوليصات المختارة ---
     function printSelectedLabels(){
-      const ids = Array.from(document.querySelectorAll('.select-label:checked')).map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
@@ -276,6 +323,10 @@
         tpl.querySelector('[data-id]').textContent      = o['رقم الطلب'];
         tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
         tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
+        if(o['ملاحظة']) {
+          tpl.querySelector('[data-note-line]').style.display = '';
+          tpl.querySelector('[data-note]').textContent = o['ملاحظة'];
+        }
         tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
         const svg = tpl.querySelector('.jsbarcode');
         JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
@@ -290,20 +341,20 @@
       setTimeout(()=>win.print(),300);
     }
 
-    // الأحداث الأساسية
+    // --- الأحداث الأساسية ---
     document.getElementById('fileInput').addEventListener('change', function(){
       const f=this.files[0]; if(!f) return;
       const r=new FileReader(); r.onload=evt=>{
         const wb=XLSX.read(evt.target.result,{type:'binary'});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        let newOrders = XLSX.utils.sheet_to_json(ws,{defval:''}).map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
-        saveHistory();
-        // إضافة الطلبات دون حذف القديمة:
-        orders = orders.concat(newOrders);
-        save(); render();
+        // دمج الطلبات الجديدة مع القديمة دون حذفها
+        const newOrders = XLSX.utils.sheet_to_json(ws,{defval:''})
+          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
+        orders = [...orders, ...newOrders];
+        save();
+        render();
       }; r.readAsBinaryString(f);
     });
-
     document.getElementById('searchInput').addEventListener('input', render);
     document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
@@ -316,16 +367,16 @@
       document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
     });
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
-      saveHistory();
       orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0));
-      save(); render();
+      save();
+      render();
     });
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
       const data = orders.map(o=>({
         'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],
         'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
-        'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
+        'ملاحظة':o['ملاحظة']||'','الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
       }));
       const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Orders');
@@ -338,28 +389,108 @@
     });
     document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
     document.getElementById('clearStorage').addEventListener('click', ()=>{
-      if (confirm("هل أنت متأكد أنك تريد حذف كل الطلبات وإعادة الصفحة للوضع الافتراضي؟")) {
+      if(confirm("سيتم حذف كل الطلبات والبيانات، هل أنت متأكد؟")){
         localStorage.removeItem('ordersData');
-        orders=[]; 
-        saveHistory();
+        orders=[]; history=[]; future=[];
+        location.reload();
+      }
+    });
+
+    // حذف جماعي
+    document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+      if(!ids.length) return alert('اختر طلبات لحذفها');
+      if(confirm("هل تريد حذف الطلبات المحددة؟")){
+        orders = orders.filter(o=>!ids.includes(o['رقم الطلب'].toString()));
+        save();
         render();
       }
     });
 
-    window.addEventListener('load', load);
+    // تغيير الحالة جماعياً
+    document.getElementById('bulkStatus').addEventListener('change', function(){
+      const v = this.value;
+      if(!v) return;
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+      if(!ids.length) return alert('اختر طلبات لتغيير حالتها');
+      orders.forEach(o=>{
+        if(ids.includes(o['رقم الطلب'].toString())) o.status=v;
+      });
+      save();
+      render();
+      this.selectedIndex = 0;
+    });
 
-    // الماسح الضوئي - إدخال رقم الطلب والبحث عنه مباشرة
-    document.getElementById('scannerInput').addEventListener('keydown', function(e){
-      if(e.key==="Enter" && this.value.trim()){
-        const v=this.value.trim();
-        const card = Array.from(document.querySelectorAll('.order-card')).find(c=>
-          c.querySelector('.order-number').textContent == v
-          || c.querySelector('strong').textContent.replace("#","") == v
-        );
-        if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
-        this.value='';
+    // --- التراجع والتقدم ---
+    document.getElementById('undoBtn').addEventListener('click', undo);
+    document.getElementById('redoBtn').addEventListener('click', redo);
+
+    // --- نافذة إضافة الطلب ---
+    const addOrderModal = new bootstrap.Modal(document.getElementById('addOrderModal'));
+    document.getElementById('addOrderBtn').addEventListener('click', ()=>addOrderModal.show());
+    document.getElementById('addOrderForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const form = e.target;
+      const data = {};
+      for(const input of form.elements){
+        if(input.name) data[input.name] = input.value;
+      }
+      data.status = "قيد الانتظار";
+      data.manualOrder = orders.length+1;
+      orders.push(data);
+      save();
+      addOrderModal.hide();
+      form.reset();
+      render();
+    });
+
+    // --- تعديل الطلب ---
+    function editOrder(o){
+      const fields = ['رقم الطلب','اسم العميل','رقم الجوال','عنوان العميل','طريقة الدفع','إجمالي الطلب','ملاحظة'];
+      let html = fields.map(f=>`
+        <div class="mb-2">
+          <label>${f}</label>
+          <input name="${f}" class="form-control" value="${o[f]||''}">
+        </div>
+      `).join('');
+      html += '<button class="btn btn-primary mt-2 w-100">حفظ التعديلات</button>';
+      const dlg = document.createElement('div');
+      dlg.innerHTML = `
+        <div class="modal show" tabindex="-1" style="display:block; background:rgba(0,0,0,0.3);">
+          <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content">${html}</form>
+          </div>
+        </div>`;
+      document.body.appendChild(dlg);
+      dlg.querySelector('form').addEventListener('submit', function(e){
+        e.preventDefault();
+        for(const input of this.elements){
+          if(input.name) o[input.name]=input.value;
+        }
+        save();
+        render();
+        dlg.remove();
+      });
+      dlg.querySelector('.modal').addEventListener('click', e=>{
+        if(e.target.classList.contains('modal')) dlg.remove();
+      });
+    }
+
+    // --- تفعيل المسح الضوئي (البحث السريع) ---
+    document.getElementById('scannerInput').addEventListener('input', function(e){
+      const val = this.value.trim();
+      if(!val) return;
+      const idx = orders.findIndex(o => o['رقم الطلب'] && o['رقم الطلب'].toString() === val);
+      if(idx > -1){
+        document.querySelectorAll('.order-card')[idx].scrollIntoView({behavior:'smooth'});
+        this.value = '';
       }
     });
+
+    window.addEventListener('load', load);
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
