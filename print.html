@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>توليد PDF</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<script>
+(async function () {
+  const orders = JSON.parse(localStorage.getItem("print_orders") || "[]");
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [95, 145] });
+
+  orders.forEach((o, i) => {
+    if (i > 0) doc.addPage();
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text("واحة التقنية اكسبريس", 10, 10);
+    doc.setFontSize(10);
+    doc.text("منطقة الرياض، حريملاء", 10, 16);
+    doc.text("جوال: 0506071823", 10, 22);
+
+    doc.setFillColor(0, 0, 0);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(65, 10, 20, 10, 'F');
+    doc.text("COD", 70, 17);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    let y = 35;
+    doc.text(`العميل: ${o['اسم العميل'] || ''}`, 10, y); y += 7;
+    doc.text(`رقم الطلب: ${o['رقم الطلب'] || ''}`, 10, y); y += 7;
+    doc.text(`جوال: ${o['رقم الجوال'] || ''}`, 10, y); y += 7;
+    doc.text(`العنوان: ${o['عنوان العميل'] || ''}`, 10, y); y += 7;
+    if (o['ملاحظة']) {
+      doc.text(`ملاحظة: ${o['ملاحظة']}`, 10, y); y += 7;
+    }
+
+    doc.setFontSize(16);
+    doc.setFont('Courier', 'bold');
+    doc.text(o['رقم الطلب'] || '', 10, 135);
+  });
+
+  const pdfBlob = doc.output('blob');
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  window.open(blobUrl, '_blank');
+})();
+</script>
+</body>
+</html>
