@@ -12,7 +12,6 @@
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-
   <style>
     body { background: #f0f8ff; font-family: sans-serif; }
     .header { text-align:center; margin:20px 0; }
@@ -22,19 +21,17 @@
     .status-filters .btn { margin:0 5px; min-width:100px; }
     .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
-    .order-card { 
-      background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
+    .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
     .order-card.cod { background:#fff8e1; border-color:#ffc107; }
+    .card-border { position:absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
+    .card-border.cod { background:#ffc107; }
+    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:bold; }
+    .select-label { position:absolute; top:10px; right:10px; z-index:10; }
     .order-info i { margin-left:5px; }
+    @page { size:95mm 145mm; margin:0; }
 
     /* بوليصة الشحن */
-    @page { size:95mm 145mm; margin:0; }
-    .label {
-      width:95mm; height:145mm; padding:3mm; box-sizing:border-box;
-      border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between;
-    }
+    .label { width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; }
     .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
     .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
     .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
@@ -44,23 +41,26 @@
     .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
     .label .cod-box .amount { background:#000; color:#fff; font-weight:bold; }
     .label .codes {
-      display:flex; justify-content:center; align-items:center;
-      gap:4mm; margin-top:4mm; padding:0 8mm;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4mm;
+      margin-top: 4mm;
+      padding: 0 8mm;
     }
     .label .barcode-wrapper { text-align:center; }
     .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
     .label .qrcode-area { width:28mm; height:28mm; }
-
   </style>
 </head>
 <body>
 
-  <!-- قالب بوليصة الشحن -->
+  <!-- قالب بوليصة الشحن مع الشعار من المستودع -->
   <template id="labelTemplate">
     <div class="label">
       <img class="label-logo"
-           src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEsCAYAAAA7Ldc6AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAFLWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyc+CgogPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9JycKICB4bWxuczpBdHRyaWI9J2h0dHA6Ly9ucy5hdHRyaWJ1dGlvbi5jb20vYWRzLzEuMC8nPgogIDxBdHRyaWI6QWRzPgogICA8cmRmOlNlcT4KICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0nUmVzb3VyY2UnPgogICAgIDxBdHRyaWI6Q3JlYXRlZD4yMDI1LTA2LTEyPC9BdHRyaWI6Q3JlYXRlZD4KICAgICA8QXR0cmliOkV4dElkPjI0MzMyMzIxLTcxMzktNDJjMi1iNjlmLTFiMjFhMjQyYzQ4YjwvQXR0cmliOkV4dElkPgogICAgIDxBdHRyaWI6RmJJZD41MjUyNjU5MTQxNzk1ODA8L0F0dHJpYjpGYklkPgogICAgIDxBdHRyaWI6VG91Y2hUeXBlPjI8L0F0dHJpYjpUb3VjaFR5cGU+CiAgICA8L3JkZjpsaT4KICAgPC9yZGY6U2VxPgogIDwvQXR0cmliOkFkcz4KIDwvcmRmOkRlc2NyaXB0aW9uPgoKIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PScnCiAgeG1sbnM6ZGM9J2h0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvJz4KICA8ZGM6dGl0bGU+CiAgIDxyZGY6QWx0PgogICAgPHJkZjpsaSB4bWw6bGFuZz0neC1kZWZhdWx0Jz7ZiNin2K3YqSDYp9mE2KrZgtmG2YrYqSAoMTAwMCB4IDUwMCDYqNmK2YPYs9mEKSAoMTAwMCB4IDUwMCDYqNmK2YPYs9mEKSAoODAwIHggMzUwINio2YrZg9iz2YQpICg4MDAgeCAzMDAg2KjZitmD2LPZhCkgLSAxPC9yZGY6bGk+CiAgIDwvcmRmOkFsdD4KICA8L2RjOnRpdGxlPgogPC9yZGY6RGVzY3JpcHRpb24+CgogPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9JycKICB4bWxuczpwZGY9J2h0dHA6Ly9ucy5hZG9iZS5jb20vcGRmLzEuMy8nPgogIDxwZGY6QXV0aG9yPtin2KjYsdin2YfZitmFINi52YrYrzwvcGRmOkF1dGhvcj4KIDwvcmRmOkRlc2NyaXB0aW9uPgoKIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PScnCiAgeG1sbnM6eG1wPSdodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvJz4KICA8eG1wOkNyZWF0b3JUb29sPkNhbnZhIGRvYz1EQUdxSmJ2VU4yVSB1c2VyPVVBRW5abFBpdDNFIGJyYW5kPdin2YTZg9mI2K8g2KfZhNix2YLZhdmKIDIgdGVtcGxhdGU9PC94bXA6Q3JlYXRvclRvb2w+CiA8L3JkZjpEZXNjcmlwdGlvbj4KPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4K" 
+           src="logo.png"
            alt="شعار واحة التقنية">
       <div class="header">
         <div class="cod-box">
@@ -89,13 +89,11 @@
     </div>
   </template>
 
-
   <div class="container">
     <div class="header">
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
-
     <div class="row controls">
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
@@ -107,8 +105,7 @@
       <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
       <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
-
-    <div class="status-filters">
+    <div class="status-filters mb-3">
       <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
       <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
       <button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل">جاري التوصيل</button>
@@ -116,10 +113,8 @@
       <button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
       <button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
     </div>
-
     <div id="ordersContainer" class="order-grid mb-4"></div>
   </div>
-
 
   <script>
     let orders = [], sortable = null, filterStatus = '';
@@ -127,11 +122,11 @@
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const messages = {
       shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
-      arrival:  `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
+      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
 
     function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
-    function load(){ const d=localStorage.getItem('ordersData'); if(d){ orders=JSON.parse(d); render(); }}
+    function load(){ const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }}
 
     function render(){
       const cont = document.getElementById('ordersContainer');
@@ -139,61 +134,57 @@
       let list = orders.slice();
       if(filterStatus) list = list.filter(o=>o.status===filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
-      if(q) list = list.filter(o=>
-        o['رقم الطلب'].toString().includes(q) ||
-        o['اسم العميل'].toLowerCase().includes(q)
-      );
+      if(q){
+        list = list.filter(o=>
+          o['رقم الطلب'].toString().includes(q) ||
+          o['اسم العميل'].toLowerCase().includes(q)
+        );
+      }
       list.forEach((o,i)=>{
-        const num = o.manualOrder|| (i+1);
+        const num = o.manualOrder||i+1;
         const tel = o['رقم الجوال'].replace(/\D/g,'');
         const cod = o['طريقة الدفع']===cashOnDelivery;
         const card = document.createElement('div');
         card.className = 'order-card position-relative'+(cod?' cod':'');
-        card.dataset.id = o['رقم الطلب'];
+        card.setAttribute('data-id', o['رقم الطلب']);
+        // رقم البطاقة فقط مره واحدة + خانة تحرير الترتيب
         card.innerHTML = `
           <input type="checkbox" class="form-check-input select-label"/>
-          <input type="number" class="form-control order-input"
-                 style="position:absolute;top:10px;left:10px;width:40px;padding:2px;font-weight:600;"
-                 min="1" value="${num}"/>
-          <div class="d-flex justify-content-between mb-2" style="margin-top:40px;">
+          <span class="order-number">${num}
+            <input type="number" class="form-control form-control-sm order-input d-inline" style="width:50px;display:inline-block;margin-right:6px;" min="1" value="${num}">
+          </span>
+          <div class="card-border${cod?' cod':''}"></div>
+          <div class="d-flex justify-content-between mb-2">
             <strong>#${o['رقم الطلب']}</strong>
-            ${cod?`<span class="badge bg-warning text-dark">عند الاستلام: ${o['إجمالي الطلب']} ر.</span>`:''}
+            ${cod?`<span class="badge bg-warning text-dark">عند الإستلام: ${o['إجمالي الطلب']} ريال</span>`:''}
           </div>
           <h5>${o['اسم العميل']}</h5>
           <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']}</p>
           <div class="d-flex mb-2">
             <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
-            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank"
-               class="btn btn-success btn-sm mx-1"><i class="bi bi-whatsapp"></i></a>
-            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank"
-               class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i></a>
-            <button class="btn btn-outline-secondary btn-sm mx-1 btn-print-label"><i class="bi bi-printer"></i></button>
+            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
+            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
+            <button class="btn btn-outline-secondary btn-sm ms-2 btn-print-label"><i class="bi bi-printer"></i></button>
           </div>
           <div class="d-flex justify-content-between align-items-center">
             <select class="form-select form-select-sm status-select" style="width:auto;">
               ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
             </select>
-          </div>
-        `;
-        // أحداث
-        card.querySelector('.order-input').addEventListener('change', e=>{
-          o.manualOrder = parseInt(e.target.value)||1; save(); render();
-        });
-        card.querySelector('.status-select').addEventListener('change', e=>{
-          o.status = e.target.value; save(); render();
-        });
-        card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+          </div>`;
         cont.appendChild(card);
+
+        card.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
+        card.querySelector('.order-input').addEventListener('change', e=>{ o.manualOrder=parseInt(e.target.value)||1; save(); render(); });
+        card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
       });
       if(!sortable) initSortable();
     }
 
     function initSortable(){
-      sortable = Sortable.create(document.getElementById('ordersContainer'),{
-        animation:150, disabled:true,
-        onEnd:()=>{
+      sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
+        onEnd: ()=>{
           const ids = Array.from(document.querySelectorAll('.order-card'))
-            .map(c=>c.dataset.id);
+            .map(c=>c.getAttribute('data-id'));
           orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
           save(); render();
         }
@@ -208,9 +199,15 @@
       tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
       tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
 
-      JsBarcode(tpl.querySelector('.jsbarcode'), o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+      // باركود
+      const svg = tpl.querySelector('.jsbarcode');
+      JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
       tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
-      new QRCode(tpl.querySelector('[data-qr]'),{ text:o['رقم الطلب'], width:100, height:100, correctLevel:QRCode.CorrectLevel.H });
+
+      // QR
+      new QRCode(tpl.querySelector('[data-qr]'), {
+        text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
+      });
 
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
@@ -222,7 +219,7 @@
 
     function printSelectedLabels(){
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
-        .map(cb=>cb.closest('.order-card').dataset.id);
+        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
@@ -235,9 +232,12 @@
         tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
         tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
         tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
-        JsBarcode(tpl.querySelector('.jsbarcode'), o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+        const svg = tpl.querySelector('.jsbarcode');
+        JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
         tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
-        new QRCode(tpl.querySelector('[data-qr]'),{ text:o['رقم الطلب'], width:100, height:100, correctLevel:QRCode.CorrectLevel.H });
+        new QRCode(tpl.querySelector('[data-qr]'), {
+          text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
+        });
         win.document.body.appendChild(tpl);
       });
       win.document.write('</body></html>');
@@ -245,43 +245,37 @@
       setTimeout(()=>win.print(),300);
     }
 
-    // أحداث عامة
+    // الأحداث الأساسية
     document.getElementById('fileInput').addEventListener('change', function(){
       const f=this.files[0]; if(!f) return;
-      const r=new FileReader();
-      r.onload=evt=>{
+      const r=new FileReader(); r.onload=evt=>{
         const wb=XLSX.read(evt.target.result,{type:'binary'});
         const ws=wb.Sheets[wb.SheetNames[0]];
         orders = XLSX.utils.sheet_to_json(ws,{defval:''})
           .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         save(); render();
-      };
-      r.readAsBinaryString(f);
+      }; r.readAsBinaryString(f);
     });
     document.getElementById('searchInput').addEventListener('input', render);
-    document.querySelectorAll('.status-btn').forEach(btn=>
-      btn.addEventListener('click', ()=>{
-        document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        filterStatus=btn.getAttribute('data-status');
-        render();
-      })
-    );
+    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      filterStatus = btn.getAttribute('data-status');
+      render();
+    }));
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
-      sortable.option('disabled', !sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent =
-        sortable.option('disabled')?'تعطيل الترتيب اليدوي':'تمكين الترتيب اليدوي';
+      sortable.option('disabled',!sortable.option('disabled'));
+      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
     });
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
-      orders.sort((a,b)=>(a.manualOrder||0)-(b.manualOrder||0));
+      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0));
       save(); render();
     });
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
-      const data=orders.map(o=>({
-        'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],
-        'رقم الجوال':o['رقم الجوال'],'عنوان العميل':o['عنوان العميل'],
-        'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
+      const data = orders.map(o=>({
+        'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],
+        'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
         'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
       }));
       const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
@@ -297,21 +291,6 @@
     document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
     document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
     window.addEventListener('load', load);
-
-    // الماسح الضوئي
-    document.getElementById('scannerInput').addEventListener('keypress', e=>{
-      if(e.key==='Enter'){
-        const val=e.target.value.trim();
-        if(!val) return;
-        const idx=orders.findIndex(o=>o['رقم الطلب'].toString()===val);
-        if(idx>=0){
-          const card=document.querySelector(`.order-card[data-id="${val}"]`);
-          card.scrollIntoView({behavior:'smooth'}); card.classList.add('border-primary');
-          setTimeout(()=>card.classList.remove('border-primary'),1000);
-        } else alert('الطلب غير موجود');
-        e.target.value='';
-      }
-    });
   </script>
 </body>
 </html>
