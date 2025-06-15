@@ -12,119 +12,56 @@
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
   <style>
-    :root {
-      --fs-base: 0.9rem;
-      --fs-heading: 1.5rem;
-      --clr-bg: #f9fbfd;
-      --clr-primary: #3b5998;
-      --clr-card-border: #dde4eb;
-      --clr-shadow: rgba(0,0,0,0.04);
+    body { background: #f0f8ff; font-family: sans-serif; }
+    .header { text-align:center; margin:20px 0; }
+    .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
+    .controls .form-control, .controls .btn { margin:5px; }
+    .status-filters { text-align:center; margin-bottom:15px; }
+    .status-filters .btn { margin:0 5px; min-width:100px; }
+    .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
+    .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+    .order-card { 
+      background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    body {
-      background: var(--clr-bg);
-      font-family: "Segoe UI", sans-serif;
-      font-size: var(--fs-base);
-      color: #333;
-      line-height: 1.5;
-    }
-    .container { max-width:1200px; margin:20px auto; }
-
-    .header h1 {
-      font-size: var(--fs-heading);
-      font-weight:600;
-      color: var(--clr-primary);
-      margin-bottom:.75rem;
-    }
-    .header input { max-width:300px; }
-
-    .toolbar {
-      background:#fff;
-      padding:8px 12px;
-      border-radius:.5rem;
-      box-shadow:0 2px 6px var(--clr-shadow);
-      display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;
-      margin-bottom:20px;
-    }
-    .toolbar .form-control, .toolbar .form-select { flex:1 1 200px; }
-    .toolbar .btn { font-size:var(--fs-base); }
-
-    .status-filters .btn {
-      font-size:var(--fs-base); margin:0 .3rem;
-    }
-    .status-filters .active {
-      box-shadow:inset 0 0 5px #00000033;
-    }
-
-    .order-grid {
-      display:grid; gap:20px;
-      grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    }
-    .order-card {
-      background:#fff;
-      border:1px solid var(--clr-card-border);
-      border-radius:.5rem;
-      padding:12px;
-      box-shadow:0 1px 4px var(--clr-shadow);
-      position:relative;
-    }
-    .order-number {
-      position:absolute; top:10px; left:10px;
-      background:#f8f9fa; padding:2px 6px;
-      border-radius:.25rem; font-weight:600;
-    }
-    .select-label {
-      position:absolute; top:10px; right:40px;
-      z-index:10;
-    }
-    .order-card.cod { background:#fff8e1; }
-    .order-card h5 { font-size:1.1rem; margin-bottom:.5rem; }
-    .order-info, .order-card p { font-size:var(--fs-base); margin-bottom:.4rem; }
+    .order-card.cod { background:#fff8e1; border-color:#ffc107; }
     .order-info i { margin-left:5px; }
 
-    .list-table { margin-top:20px; }
-    .list-table table { width:100%; }
-    .list-table th, .list-table td { vertical-align:middle; font-size:var(--fs-base); }
-
+    /* بوليصة الشحن */
     @page { size:95mm 145mm; margin:0; }
     .label {
-      width:95mm; height:145mm; padding:3mm;
-      display:flex; flex-direction:column; justify-content:space-between;
-      font-size:var(--fs-base);
+      width:95mm; height:145mm; padding:3mm; box-sizing:border-box;
+      border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between;
     }
-    .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; }
-    .label .header {
-      display:flex; justify-content:space-between; align-items:center;
-    }
-    .label .company-info, .label .info-box {
-      border:1px solid #000; padding:2mm;
-    }
-    .label .info-box .line { margin-bottom:1mm; font-weight:500; }
-    .label .cod-box {
-      display:flex; flex-direction:column;
-      width:30mm; height:20mm; text-align:center;
-      border:1px solid #000;
-    }
-    .label .cod-box .title, .label .cod-box .amount {
-      flex:1; line-height:10mm; font-weight:600;
-    }
-    .label .cod-box .amount { background:#000; color:#fff; }
+    .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
+    .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
+    .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
+    .label .info-box { margin:2mm 0; }
+    .label .info-box .line { margin-bottom:1mm; }
+    .label .cod-box { display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000; }
+    .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
+    .label .cod-box .amount { background:#000; color:#fff; font-weight:bold; }
     .label .codes {
       display:flex; justify-content:center; align-items:center;
       gap:4mm; margin-top:4mm; padding:0 8mm;
     }
-    .label .barcode-wrapper svg { width:60mm; }
-    .label .barcode-text {
-      margin-top:1mm; font-size:10pt; font-weight:bold;
-    }
+    .label .barcode-wrapper { text-align:center; }
+    .label .barcode-wrapper svg { width:60mm; height:auto; }
+    .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
     .label .qrcode-area { width:28mm; height:28mm; }
+
   </style>
 </head>
 <body>
 
+  <!-- قالب بوليصة الشحن -->
   <template id="labelTemplate">
     <div class="label">
-      <img class="label-logo" src="logo.png" alt="شعار">
+      <img class="label-logo"
+           src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAEsCAYAAAA7Ldc6AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAFLWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyc+CgogPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9JycKICB4bWxuczpBdHRyaWI9J2h0dHA6Ly9ucy5hdHRyaWJ1dGlvbi5jb20vYWRzLzEuMC8nPgogIDxBdHRyaWI6QWRzPgogICA8cmRmOlNlcT4KICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0nUmVzb3VyY2UnPgogICAgIDxBdHRyaWI6Q3JlYXRlZD4yMDI1LTA2LTEyPC9BdHRyaWI6Q3JlYXRlZD4KICAgICA8QXR0cmliOkV4dElkPjI0MzMyMzIxLTcxMzktNDJjMi1iNjlmLTFiMjFhMjQyYzQ4YjwvQXR0cmliOkV4dElkPgogICAgIDxBdHRyaWI6RmJJZD41MjUyNjU5MTQxNzk1ODA8L0F0dHJpYjpGYklkPgogICAgIDxBdHRyaWI6VG91Y2hUeXBlPjI8L0F0dHJpYjpUb3VjaFR5cGU+CiAgICA8L3JkZjpsaT4KICAgPC9yZGY6U2VxPgogIDwvQXR0cmliOkFkcz4KIDwvcmRmOkRlc2NyaXB0aW9uPgoKIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PScnCiAgeG1sbnM6ZGM9J2h0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvJz4KICA8ZGM6dGl0bGU+CiAgIDxyZGY6QWx0PgogICAgPHJkZjpsaSB4bWw6bGFuZz0neC1kZWZhdWx0Jz7ZiNin2K3YqSDYp9mE2KrZgtmG2YrYqSAoMTAwMCB4IDUwMCDYqNmK2YPYs9mEKSAoMTAwMCB4IDUwMCDYqNmK2YPYs9mEKSAoODAwIHggMzUwINio2YrZg9iz2YQpICg4MDAgeCAzMDAg2KjZitmD2LPZhCkgLSAxPC9yZGY6bGk+CiAgIDwvcmRmOkFsdD4KICA8L2RjOnRpdGxlPgogPC9yZGY6RGVzY3JpcHRpb24+CgogPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9JycKICB4bWxuczpwZGY9J2h0dHA6Ly9ucy5hZG9iZS5jb20vcGRmLzEuMy8nPgogIDxwZGY6QXV0aG9yPtin2KjYsdin2YfZitmFINi52YrYrzwvcGRmOkF1dGhvcj4KIDwvcmRmOkRlc2NyaXB0aW9uPgoKIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PScnCiAgeG1sbnM6eG1wPSdodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvJz4KICA8eG1wOkNyZWF0b3JUb29sPkNhbnZhIGRvYz1EQUdxSmJ2VU4yVSB1c2VyPVVBRW5abFBpdDNFIGJyYW5kPdin2YTZg9mI2K8g2KfZhNix2YLZhdmKIDIgdGVtcGxhdGU9PC94bXA6Q3JlYXRvclRvb2w+CiA8L3JkZjpEZXNjcmlwdGlvbj4KPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4K" 
+           alt="شعار واحة التقنية">
       <div class="header">
         <div class="cod-box">
           <div class="title">الدفع عند الاستلام</div>
@@ -132,8 +69,8 @@
         </div>
         <div class="company-info">
           <div class="name">واحة التقنية اكسبريس</div>
-          <div>الرياض، حريملاء</div>
-          <div>0506071823</div>
+          <div>منطقة الرياض، حريملاء</div>
+          <div>جوال: 0506071823</div>
         </div>
       </div>
       <div class="info-box">
@@ -152,74 +89,26 @@
     </div>
   </template>
 
+
   <div class="container">
-    <div class="header text-center">
-      <h1>منظم طلبات التوصيل</h1>
-      <input id="scannerInput" class="form-control mx-auto mb-3" placeholder="امسح رقم الطلب هنا" autofocus>
+    <div class="header">
+      <h1 class="text-primary">منظم طلبات التوصيل</h1>
+      <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
 
-    <div class="toolbar">
-      <button id="cardViewBtn" class="btn btn-outline-primary active">
-        <i class="bi bi-grid-fill"></i> عرض البطاقات
-      </button>
-      <button id="listViewBtn" class="btn btn-outline-primary">
-        <i class="bi bi-list-ul"></i> عرض القائمة
-      </button>
-
-      <input id="fileInput" type="file" accept=".xlsx,.xls" class="form-control" />
-
-      <button id="addOrderBtn" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> إضافة طلب
-      </button>
-
-      <input id="searchInput" class="form-control" placeholder="ابحث برقم أو اسم" />
-
-      <button id="manualSortBtn" class="btn btn-info">
-        <i class="bi bi-list-nested"></i> ترتيب يدوي
-      </button>
-
-      <button id="applyNumberBtn" class="btn btn-secondary">
-        <i class="bi bi-sort-numeric-down"></i> تطبيق الترقيم
-      </button>
-
-      <button id="exportBtn" class="btn btn-success">
-        <i class="bi bi-file-earmark-excel"></i> تصدير Excel
-      </button>
-
-      <button id="selectAllBtn" class="btn btn-outline-secondary">
-        <i class="bi bi-check2-all"></i> تحديد الكل
-      </button>
-
-      <button id="deleteSelectedBtn" class="btn btn-outline-danger">
-        <i class="bi bi-trash"></i> حذف المحدد
-      </button>
-
-      <select id="bulkStatusSelect" class="form-select" style="max-width:150px">
-        <option value="">-- تغيير حالة جماعية --</option>
-        <option>قيد الانتظار</option>
-        <option>جاري التوصيل</option>
-        <option>تم التوصيل</option>
-        <option>مؤجل</option>
-        <option>مرفوض</option>
-      </select>
-      <button id="applyBulkStatusBtn" class="btn btn-outline-info">
-        <i class="bi bi-arrow-repeat"></i> تنفيذ التغيير
-      </button>
-
-      <button id="printSelectedBtn" class="btn btn-outline-primary">
-        <i class="bi bi-printer-fill"></i> طباعة المحدد
-      </button>
-
-      <button id="resetOrderBtn" class="btn btn-warning">
-        <i class="bi bi-arrow-counterclockwise"></i> إعادة الأصلية
-      </button>
-
-      <button id="clearStorage" class="btn btn-danger">
-        <i class="bi bi-trash"></i> مسح الكل
-      </button>
+    <div class="row controls">
+      <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
+      <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
+      <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
+      <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
+      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <button id="selectAllBtn" class="btn btn-outline-secondary btn-sm col-auto">تحديد الكل</button>
+      <button id="printSelectedBtn" class="btn btn-outline-primary btn-sm col-auto">طباعة بوليصات مختارة</button>
+      <button id="resetOrderBtn" class="btn btn-secondary btn-sm col-auto">إعادة الأصلية</button>
+      <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
     </div>
 
-    <div class="status-filters text-center mb-4">
+    <div class="status-filters">
       <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
       <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
       <button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل">جاري التوصيل</button>
@@ -229,82 +118,24 @@
     </div>
 
     <div id="ordersContainer" class="order-grid mb-4"></div>
-    <div id="listContainer" class="list-table mb-4" style="display:none"></div>
   </div>
 
-  <!-- Modals Add/Edit -->
-  <div class="modal fade" id="addModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered"><div class="modal-content text-end">
-      <div class="modal-header">
-        <h5 class="modal-title">إضافة طلب جديد</h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2"><label>رقم الطلب</label><input id="newId" class="form-control"></div>
-        <div class="mb-2"><label>اسم العميل</label><input id="newName" class="form-control"></div>
-        <div class="mb-2"><label>رقم الجوال</label><input id="newPhone" class="form-control"></div>
-        <div class="mb-2"><label>العنوان</label><input id="newAddress" class="form-control"></div>
-        <div class="mb-2"><label>طريقة الدفع</label>
-          <select id="newPayment" class="form-select">
-            <option>دفع عند الإستلام</option>
-            <option>دفع إلكتروني</option>
-          </select>
-        </div>
-        <div class="mb-2"><label>إجمالي الطلب</label><input id="newTotal" type="number" class="form-control"></div>
-        <div class="mb-2"><label>ملاحظة</label><input id="newNote" class="form-control"></div>
-      </div>
-      <div class="modal-footer">
-        <button id="saveNewOrder" class="btn btn-success">حفظ</button>
-        <button class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-      </div>
-    </div></div>
-  </div>
-  <div class="modal fade" id="editModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered"><div class="modal-content text-end">
-      <div class="modal-header">
-        <h5 class="modal-title">تحرير معلومات الطلب</h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2"><label>رقم الطلب</label><input id="editId" class="form-control" disabled></div>
-        <div class="mb-2"><label>اسم العميل</label><input id="editName" class="form-control"></div>
-        <div class="mb-2"><label>رقم الجوال</label><input id="editPhone" class="form-control"></div>
-        <div class="mb-2"><label>العنوان</label><input id="editAddress" class="form-control"></div>
-        <div class="mb-2"><label>طريقة الدفع</label>
-          <select id="editPayment" class="form-select">
-            <option>دفع عند الإستلام</option>
-            <option>دفع إلكتروني</option>
-          </select>
-        </div>
-        <div class="mb-2"><label>إجمالي الطلب</label><input id="editTotal" type="number" class="form-control"></div>
-        <div class="mb-2"><label>ملاحظة</label><input id="editNote" class="form-control"></div>
-      </div>
-      <div class="modal-footer">
-        <button id="saveEditOrder" class="btn btn-success">حفظ التعديلات</button>
-        <button class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-      </div>
-    </div></div>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    let orders = [], sortable = null, filterStatus = '', viewMode = 'cards', editIndex = null;
+    let orders = [], sortable = null, filterStatus = '';
     const cashOnDelivery = 'دفع عند الإستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const messages = {
       shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
-      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
+      arrival:  `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
 
     function save(){ localStorage.setItem('ordersData', JSON.stringify(orders)); }
-    function load(){ const d = localStorage.getItem('ordersData'); if(d) orders = JSON.parse(d); render(); }
+    function load(){ const d=localStorage.getItem('ordersData'); if(d){ orders=JSON.parse(d); render(); }}
 
     function render(){
       const cont = document.getElementById('ordersContainer');
-      const listCont = document.getElementById('listContainer');
       cont.innerHTML = '';
-      listCont.innerHTML = '';
-      // filter + search
       let list = orders.slice();
       if(filterStatus) list = list.filter(o=>o.status===filterStatus);
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -312,103 +143,55 @@
         o['رقم الطلب'].toString().includes(q) ||
         o['اسم العميل'].toLowerCase().includes(q)
       );
-      // بطاقة
-      if(viewMode==='cards'){
-        cont.style.display='grid';
-        listCont.style.display='none';
-        list.forEach((o,i)=>{
-          const num = o.manualOrder||i+1;
-          const tel = o['رقم الجوال'].replace(/\D/g,'');
-          const cod = o['طريقة الدفع']===cashOnDelivery;
-          const card = document.createElement('div');
-          card.className = 'order-card'+(cod?' cod':'');
-          card.setAttribute('data-id',o['رقم الطلب']);
-          card.innerHTML=`
-            <input type="checkbox" class="form-check-input select-label"/>
-            <span class="order-number">${num}</span>
-            <div class="d-flex justify-content-between mb-2">
-              <strong>#${o['رقم الطلب']}</strong>
-              ${cod?`<span class="badge bg-warning text-dark">عند الاستلام: ${o['إجمالي الطلب']} ر.</span>`:''}
-            </div>
-            <h5>${o['اسم العميل']}</h5>
-            <p class="order-info"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']}</p>
-            <div class="d-flex mb-2">
-              <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
-              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm mx-1"><i class="bi bi-whatsapp"></i></a>
-              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i></a>
-              <button class="btn btn-outline-secondary btn-sm mx-1 btn-print-label"><i class="bi bi-printer"></i></button>
-              <button class="btn btn-outline-secondary btn-sm btn-edit-label"><i class="bi bi-pencil"></i></button>
-            </div>
-            <div class="d-flex justify-content-between align-items-center">
-              <select class="form-select form-select-sm status-select" style="width:auto">
-                ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
-              </select>
-              <input type="number" class="form-control form-control-sm order-input" style="width:60px" min="1" value="${num}">
-            </div>`;
-          cont.appendChild(card);
-          // event listeners
-          card.querySelector('.status-select').onchange = e=>{ o.status=e.target.value; save(); render(); };
-          card.querySelector('.order-input').onchange = e=>{ o.manualOrder=parseInt(e.target.value)||1; save(); };
-          card.querySelector('.btn-print-label').onclick = ()=>generateLabel(o);
-          card.querySelector('.btn-edit-label').onclick = ()=>openEditModal(o);
+      list.forEach((o,i)=>{
+        const num = o.manualOrder|| (i+1);
+        const tel = o['رقم الجوال'].replace(/\D/g,'');
+        const cod = o['طريقة الدفع']===cashOnDelivery;
+        const card = document.createElement('div');
+        card.className = 'order-card position-relative'+(cod?' cod':'');
+        card.dataset.id = o['رقم الطلب'];
+        card.innerHTML = `
+          <input type="checkbox" class="form-check-input select-label"/>
+          <input type="number" class="form-control order-input"
+                 style="position:absolute;top:10px;left:10px;width:40px;padding:2px;font-weight:600;"
+                 min="1" value="${num}"/>
+          <div class="d-flex justify-content-between mb-2" style="margin-top:40px;">
+            <strong>#${o['رقم الطلب']}</strong>
+            ${cod?`<span class="badge bg-warning text-dark">عند الاستلام: ${o['إجمالي الطلب']} ر.</span>`:''}
+          </div>
+          <h5>${o['اسم العميل']}</h5>
+          <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']}</p>
+          <div class="d-flex mb-2">
+            <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
+            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank"
+               class="btn btn-success btn-sm mx-1"><i class="bi bi-whatsapp"></i></a>
+            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank"
+               class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i></a>
+            <button class="btn btn-outline-secondary btn-sm mx-1 btn-print-label"><i class="bi bi-printer"></i></button>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <select class="form-select form-select-sm status-select" style="width:auto;">
+              ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        `;
+        // أحداث
+        card.querySelector('.order-input').addEventListener('change', e=>{
+          o.manualOrder = parseInt(e.target.value)||1; save(); render();
         });
-        if(!sortable) initSortable();
-      }
-      // قائمة
-      else {
-        cont.style.display='none';
-        listCont.style.display='block';
-        let html = `<table class="table table-striped">
-          <thead><tr>
-            <th><input type="checkbox" id="chkAllList"></th>
-            <th>#</th><th>رقم</th><th>اسم العميل</th><th>جوال</th>
-            <th>العنوان</th><th>حالة</th><th>دفع</th>
-            <th>إجمالي</th><th>طباعة</th><th>تحرير</th>
-          </tr></thead><tbody>`;
-        list.forEach((o,i)=>{
-          const num = o.manualOrder||i+1;
-          const tel = o['رقم الجوال'].replace(/\D/g,'');
-          html += `<tr data-id="${o['رقم الطلب']}">
-            <td><input type="checkbox" class="chkList"></td>
-            <td>${num}</td>
-            <td>${o['رقم الطلب']}</td>
-            <td>${o['اسم العميل']}</td>
-            <td>${o['رقم الجوال']}</td>
-            <td>${o['عنوان العميل']}</td>
-            <td>${o.status}</td>
-            <td>${o['طريقة الدفع']}</td>
-            <td>${o['إجمالي الطلب']}</td>
-            <td><button class="btn btn-sm btn-outline-primary btn-print-label"><i class="bi bi-printer"></i></button></td>
-            <td><button class="btn btn-sm btn-outline-secondary btn-edit-label"><i class="bi bi-pencil"></i></button></td>
-          </tr>`;
+        card.querySelector('.status-select').addEventListener('change', e=>{
+          o.status = e.target.value; save(); render();
         });
-        html += `</tbody></table>`;
-        listCont.innerHTML = html;
-        // list events
-        document.getElementById('chkAllList').onchange = e=>{
-          document.querySelectorAll('.chkList').forEach(ch=>ch.checked=e.target.checked);
-        };
-        document.querySelectorAll('#listContainer .btn-print-label').forEach(btn=>{
-          btn.onclick = ()=> {
-            const id = btn.closest('tr').dataset.id;
-            const o = orders.find(x=>x['رقم الطلب'].toString()===id);
-            generateLabel(o);
-          };
-        });
-        document.querySelectorAll('#listContainer .btn-edit-label').forEach(btn=>{
-          btn.onclick = ()=> {
-            const id = btn.closest('tr').dataset.id;
-            const o = orders.find(x=>x['رقم الطلب'].toString()===id);
-            openEditModal(o);
-          };
-        });
-      }
+        card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+        cont.appendChild(card);
+      });
+      if(!sortable) initSortable();
     }
 
     function initSortable(){
-      sortable = Sortable.create(document.getElementById('ordersContainer'), {
+      sortable = Sortable.create(document.getElementById('ordersContainer'),{
         animation:150, disabled:true,
-        onEnd: ()=>{
+        onEnd:()=>{
           const ids = Array.from(document.querySelectorAll('.order-card'))
             .map(c=>c.dataset.id);
           orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
@@ -419,17 +202,16 @@
 
     function generateLabel(o){
       const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
-      tpl.querySelector('[data-name]').textContent = o['اسم العميل'];
-      tpl.querySelector('[data-id]').textContent   = o['رقم الطلب'];
-      tpl.querySelector('[data-phone]').textContent= o['رقم الجوال'];
+      tpl.querySelector('[data-name]').textContent    = o['اسم العميل'];
+      tpl.querySelector('[data-id]').textContent      = o['رقم الطلب'];
+      tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
       tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
-      tpl.querySelector('[data-cod]').textContent  = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
-      const svg = tpl.querySelector('.jsbarcode');
-      JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+      tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
+
+      JsBarcode(tpl.querySelector('.jsbarcode'), o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
       tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
-      new QRCode(tpl.querySelector('[data-qr]'), {
-        text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
-      });
+      new QRCode(tpl.querySelector('[data-qr]'),{ text:o['رقم الطلب'], width:100, height:100, correctLevel:QRCode.CorrectLevel.H });
+
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
       win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
@@ -439,8 +221,8 @@
     }
 
     function printSelectedLabels(){
-      const ids = Array.from(document.querySelectorAll('.select-label:checked, .chkList:checked'))
-        .map(cb=>cb.closest('[data-id]').dataset.id);
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card').dataset.id);
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
@@ -453,12 +235,9 @@
         tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال'];
         tpl.querySelector('[data-address]').textContent = o['عنوان العميل'];
         tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']:'0';
-        const svg = tpl.querySelector('.jsbarcode');
-        JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+        JsBarcode(tpl.querySelector('.jsbarcode'), o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
         tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
-        new QRCode(tpl.querySelector('[data-qr]'), {
-          text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
-        });
+        new QRCode(tpl.querySelector('[data-qr]'),{ text:o['رقم الطلب'], width:100, height:100, correctLevel:QRCode.CorrectLevel.H });
         win.document.body.appendChild(tpl);
       });
       win.document.write('</body></html>');
@@ -466,29 +245,15 @@
       setTimeout(()=>win.print(),300);
     }
 
-    function openEditModal(o){
-      editIndex = orders.findIndex(x=>x['رقم الطلب']===o['رقم الطلب']);
-      document.getElementById('editId').value      = o['رقم الطلب'];
-      document.getElementById('editName').value    = o['اسم العميل'];
-      document.getElementById('editPhone').value   = o['رقم الجوال'];
-      document.getElementById('editAddress').value = o['عنوان العميل'];
-      document.getElementById('editPayment').value = o['طريقة الدفع'];
-      document.getElementById('editTotal').value   = o['إجمالي الطلب'];
-      document.getElementById('editNote').value    = o['ملاحظة']||'';
-      new bootstrap.Modal(document.getElementById('editModal')).show();
-    }
-
-    // الأحداث
+    // أحداث عامة
     document.getElementById('fileInput').addEventListener('change', function(){
-      const f = this.files[0]; if(!f) return;
-      const r = new FileReader();
-      r.onload = evt => {
-        const wb = XLSX.read(evt.target.result, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const newO = XLSX.utils.sheet_to_json(ws, { defval: '' })
-          .map(r=>({ ...r, status:'قيد الانتظار', manualOrder:null }));
-        const existing = new Set(orders.map(o=>o['رقم الطلب'].toString()));
-        newO.forEach(o=>{ if(!existing.has(o['رقم الطلب'].toString())) orders.push(o); });
+      const f=this.files[0]; if(!f) return;
+      const r=new FileReader();
+      r.onload=evt=>{
+        const wb=XLSX.read(evt.target.result,{type:'binary'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        orders = XLSX.utils.sheet_to_json(ws,{defval:''})
+          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         save(); render();
       };
       r.readAsBinaryString(f);
@@ -498,102 +263,55 @@
       btn.addEventListener('click', ()=>{
         document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
-        filterStatus = btn.dataset.status;
+        filterStatus=btn.getAttribute('data-status');
         render();
       })
     );
-    document.getElementById('cardViewBtn').onclick = ()=>{
-      viewMode='cards'; render();
-      document.getElementById('cardViewBtn').classList.add('active');
-      document.getElementById('listViewBtn').classList.remove('active');
-    };
-    document.getElementById('listViewBtn').onclick = ()=>{
-      viewMode='list'; render();
-      document.getElementById('listViewBtn').classList.add('active');
-      document.getElementById('cardViewBtn').classList.remove('active');
-    };
-    document.getElementById('manualSortBtn').onclick = ()=>{
-      sortable.option('disabled',!sortable.option('disabled'));
+    document.getElementById('manualSortBtn').addEventListener('click', ()=>{
+      sortable.option('disabled', !sortable.option('disabled'));
       document.getElementById('manualSortBtn').textContent =
-        sortable.option('disabled')?'ترتيب يدوي':'تعطيل الترتيب';
-    };
-    document.getElementById('applyNumberBtn').onclick = ()=>{
+        sortable.option('disabled')?'تعطيل الترتيب اليدوي':'تمكين الترتيب اليدوي';
+    });
+    document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
       orders.sort((a,b)=>(a.manualOrder||0)-(b.manualOrder||0));
       save(); render();
-    };
-    document.getElementById('exportBtn').onclick = ()=>{
+    });
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
-      const data = orders.map(o=>({
+      const data=orders.map(o=>({
         'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],
         'رقم الجوال':o['رقم الجوال'],'عنوان العميل':o['عنوان العميل'],
         'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
-        'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||'','ملاحظة':o['ملاحظة']||''
+        'الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
       }));
-      const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
+      const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Orders');
       XLSX.writeFile(wb,'Orders_export.xlsx');
-    };
-    document.getElementById('selectAllBtn').onclick = ()=>{
-      const all = [...document.querySelectorAll('.select-label'), ...document.querySelectorAll('.chkList')];
-      const any = all.some(cb=>!cb.checked);
-      all.forEach(cb=>cb.checked=any);
-    };
-    document.getElementById('deleteSelectedBtn').onclick = ()=>{
-      const toDel = new Set([...document.querySelectorAll('.select-label:checked'),
-                              ...document.querySelectorAll('.chkList:checked')]
-                            .map(cb=>cb.closest('[data-id]').dataset.id));
-      if(!toDel.size) return alert('لم تختر شيئاً للحذف');
-      orders = orders.filter(o=>!toDel.has(o['رقم الطلب'].toString()));
-      save(); render();
-    };
-    document.getElementById('applyBulkStatusBtn').onclick = ()=>{
-      const st = document.getElementById('bulkStatusSelect').value;
-      if(!st) return;
-      const sels = new Set([...document.querySelectorAll('.select-label:checked'),
-                            ...document.querySelectorAll('.chkList:checked')]
-                          .map(cb=>cb.closest('[data-id]').dataset.id));
-      orders.forEach(o=>{
-        if(sels.has(o['رقم الطلب'].toString())) o.status = st;
-      });
-      save(); render();
-    };
-    document.getElementById('printSelectedBtn').onclick = printSelectedLabels;
-    document.getElementById('resetOrderBtn').onclick = ()=>{ localStorage.removeItem('ordersData'); location.reload(); };
-    document.getElementById('clearStorage').onclick = ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); };
-
-    // إضافة طلب جديد
-    document.getElementById('addOrderBtn').onclick = ()=> new bootstrap.Modal(document.getElementById('addModal')).show();
-    document.getElementById('saveNewOrder').onclick = ()=>{
-      const o = {
-        'رقم الطلب':document.getElementById('newId').value.trim(),
-        'اسم العميل':document.getElementById('newName').value.trim(),
-        'رقم الجوال':document.getElementById('newPhone').value.trim(),
-        'عنوان العميل':document.getElementById('newAddress').value.trim(),
-        'طريقة الدفع':document.getElementById('newPayment').value,
-        'إجمالي الطلب':document.getElementById('newTotal').value,
-        'ملاحظة':document.getElementById('newNote').value,
-        status:'قيد الانتظار', manualOrder:null
-      };
-      if(!o['رقم الطلب']) return alert('رقم الطلب مطلوب');
-      orders.push(o);
-      save(); render();
-      bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-    };
-
-    // حفظ تحرير الطلب
-    document.getElementById('saveEditOrder').onclick = ()=>{
-      const o = orders[editIndex];
-      o['اسم العميل']  = document.getElementById('editName').value.trim();
-      o['رقم الجوال']   = document.getElementById('editPhone').value.trim();
-      o['عنوان العميل'] = document.getElementById('editAddress').value.trim();
-      o['طريقة الدفع']  = document.getElementById('editPayment').value;
-      o['إجمالي الطلب'] = document.getElementById('editTotal').value;
-      o['ملاحظة']      = document.getElementById('editNote').value;
-      save(); render();
-      bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-    };
-
+    });
+    document.getElementById('selectAllBtn').addEventListener('click', ()=>{
+      const boxes=Array.from(document.querySelectorAll('.select-label'));
+      const anyUnchecked=boxes.some(cb=>!cb.checked);
+      boxes.forEach(cb=>cb.checked=anyUnchecked);
+    });
+    document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
+    document.getElementById('resetOrderBtn').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); location.reload(); });
+    document.getElementById('clearStorage').addEventListener('click', ()=>{ localStorage.removeItem('ordersData'); orders=[]; render(); });
     window.addEventListener('load', load);
+
+    // الماسح الضوئي
+    document.getElementById('scannerInput').addEventListener('keypress', e=>{
+      if(e.key==='Enter'){
+        const val=e.target.value.trim();
+        if(!val) return;
+        const idx=orders.findIndex(o=>o['رقم الطلب'].toString()===val);
+        if(idx>=0){
+          const card=document.querySelector(`.order-card[data-id="${val}"]`);
+          card.scrollIntoView({behavior:'smooth'}); card.classList.add('border-primary');
+          setTimeout(()=>card.classList.remove('border-primary'),1000);
+        } else alert('الطلب غير موجود');
+        e.target.value='';
+      }
+    });
   </script>
 </body>
 </html>
