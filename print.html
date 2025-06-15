@@ -3,25 +3,36 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>توليد PDF</title>
+  <title>تحميل البوليصات كـ PDF</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
-<body>
+<body style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+  <h2>جاري تجهيز ملف PDF...</h2>
+  <p id="status">الرجاء الانتظار...</p>
+
 <script>
 (async function () {
   const orders = JSON.parse(localStorage.getItem("print_orders") || "[]");
+  if (!orders.length) {
+    document.getElementById("status").textContent = "لا توجد بيانات بوليصات للطباعة.";
+    return;
+  }
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [95, 145] });
 
   orders.forEach((o, i) => {
     if (i > 0) doc.addPage();
 
-    doc.setFont('Helvetica', 'bold');
+    doc.setDrawColor(0);
+    doc.rect(5, 5, 85, 135);
+
+    doc.setFont("Helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("واحة التقنية اكسبريس", 10, 10);
+    doc.text("واحة التقنية اكسبريس", 10, 15);
     doc.setFontSize(10);
-    doc.text("منطقة الرياض، حريملاء", 10, 16);
-    doc.text("جوال: 0506071823", 10, 22);
+    doc.text("منطقة الرياض، حريملاء", 10, 21);
+    doc.text("جوال: 0506071823", 10, 27);
 
     doc.setFillColor(0, 0, 0);
     doc.setTextColor(255, 255, 255);
@@ -29,8 +40,9 @@
     doc.text("COD", 70, 17);
 
     doc.setTextColor(0, 0, 0);
+    doc.setFont("Helvetica", "normal");
     doc.setFontSize(11);
-    let y = 35;
+    let y = 40;
     doc.text(`العميل: ${o['اسم العميل'] || ''}`, 10, y); y += 7;
     doc.text(`رقم الطلب: ${o['رقم الطلب'] || ''}`, 10, y); y += 7;
     doc.text(`جوال: ${o['رقم الجوال'] || ''}`, 10, y); y += 7;
@@ -40,13 +52,14 @@
     }
 
     doc.setFontSize(16);
-    doc.setFont('Courier', 'bold');
-    doc.text(o['رقم الطلب'] || '', 10, 135);
+    doc.setFont("Courier", "bold");
+    doc.text(o['رقم الطلب'] || '', 10, 130);
   });
 
-  const pdfBlob = doc.output('blob');
-  const blobUrl = URL.createObjectURL(pdfBlob);
-  window.open(blobUrl, '_blank');
+  const firstOrderId = orders[0]['رقم الطلب'] || 'labels';
+  const fileName = `order_${firstOrderId}.pdf`;
+  doc.save(fileName);
+  document.getElementById("status").textContent = "تم تحميل الملف بنجاح: " + fileName;
 })();
 </script>
 </body>
