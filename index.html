@@ -57,7 +57,7 @@
     /* التأكد من عدم تقطيع البوليصة */
     @media print {
       body { background: #fff !important; }
-      .label { page-break-after: always; }
+      .label { page-break-after: always; page-break-inside: avoid; }
       .label:last-child { page-break-after: auto; }
       .container, .header, .controls, .status-filters { display:none !important; }
       #ordersContainer { margin:0 !important; }
@@ -65,6 +65,14 @@
   </style>
 </head>
 <body>
+
+<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
+<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+
+
+<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
+<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+
 
   <!-- قالب بوليصة الشحن مع الشعار -->
   <template id="labelTemplate">
@@ -516,16 +524,27 @@
 
     // إدخال رقم عبر الماسح الضوئي
     document.getElementById('scannerInput').addEventListener('keydown', function(e){
-      if(e.key==="Enter"){
-        const val=this.value.trim();
+      if(e.key === "Enter"){
+        const val = this.value.trim();
         if(val){
-          const idx=orders.findIndex(x=>(x['رقم الطلب']||'').toString()===val);
-          if(idx!==-1){
+          const idx = orders.findIndex(x => (x['رقم الطلب'] || '').toString() === val);
+          const soundSuccess = document.getElementById('sound-success');
+          const soundError = document.getElementById('sound-error');
+          if(idx !== -1){
+            if (orders[idx].status === 'قيد الانتظار') {
+              orders[idx].status = 'جاري التوصيل';
+              save(); render();
+              soundSuccess?.play();
+            } else {
+              soundError?.play();
+            }
             document.querySelectorAll('.order-card,.order-list-row')[idx]?.scrollIntoView({behavior:'smooth'});
             document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.add('table-primary');
-            setTimeout(()=>document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.remove('table-primary'),2000);
+            setTimeout(() => document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.remove('table-primary'), 2000);
+          } else {
+            soundError?.play();
           }
-          this.value='';
+          this.value = '';
         }
       }
     });
