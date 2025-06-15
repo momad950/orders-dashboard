@@ -14,10 +14,13 @@
     body { background: #f0f8ff; font-family: sans-serif; }
     .header { text-align:center; margin:20px 0; }
     .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
-    .controls .form-control, .controls .btn { margin:5px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; align-items:center; margin-bottom:10px;}
+    .toolbar .btn, .toolbar .form-select { min-width:100px;}
+    .undo-redo-btns { margin:0 8px; }
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
-    .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
-    .order-card.cod { background:#fff8e1; border-color:#ffc107; }
+    .order-list { display:block; }
+    .order-card, .order-list-row { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; margin-bottom:12px;}
+    .order-card.cod, .order-list-row.cod { background:#fff8e1; border-color:#ffc107; }
     .card-border { position:absolute; top:0; right:0; width:5px; height:100%; background:#5a35ff; border-top-right-radius:.5rem; border-bottom-right-radius:.5rem; }
     .card-border.cod { background:#ffc107; }
     .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; }
@@ -49,15 +52,16 @@
     .label .barcode-wrapper svg { width:60mm; height:auto; }
     .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
     .label .qrcode-area { width:28mm; height:28mm; }
-    /* --- لمسة جمالية للأزرار العليا --- */
-    .toolbar { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; align-items:center; margin-bottom:10px;}
-    .toolbar .btn, .toolbar .form-select { min-width:100px;}
-    .undo-redo-btns { margin:0 8px; }
-    /* --- */
+    .view-switch-btn {min-width:100px;}
+    /* العرض القائمة */
+    .order-list-row { display: flex; align-items: center; gap:12px; }
+    .order-list-row .order-info-list { flex:1; }
+    .order-list-row .order-input {width:55px;}
+    .order-list-row .order-number {position:static; background:#f8f9fa; border-radius:.25rem;}
   </style>
 </head>
 <body>
-  <!-- قالب بوليصة الشحن مع الشعار من المستودع -->
+  <!-- قالب بوليصة الشحن -->
   <template id="labelTemplate">
     <div class="label">
       <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
@@ -94,12 +98,12 @@
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
-    <!-- الشريط العلوي للأزرار والميزات -->
     <div class="toolbar">
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
       <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
       <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
+      <button id="viewSwitchBtn" class="btn btn-outline-dark btn-sm view-switch-btn">العرض: شبكة</button>
       <select id="bulkStatus" class="form-select form-select-sm col-auto" style="width:auto;">
         <option value="">تغيير حالة الطلبات المحددة</option>
         <option value="قيد الانتظار">قيد الانتظار</option>
@@ -155,8 +159,16 @@
   </div>
 
   <script>
-    // --- التخزين الاحتياطي للتراجع والتقدم ---
+    let orders = [], sortable = null, filterStatus = '';
+    let viewType = 'grid'; // grid or list
     let history = [], future = [];
+    const cashOnDelivery = 'دفع عند الإستلام';
+    const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
+    const messages = {
+      shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
+      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
+    };
+
     function pushHistory() {
       history.push(JSON.stringify(orders));
       if (history.length > 50) history.shift();
@@ -178,17 +190,6 @@
         render();
       }
     }
-
-    // --- بيانات الطلبات والمزايا الرئيسية ---
-    let orders = [], sortable = null, filterStatus = '';
-    const cashOnDelivery = 'دفع عند الإستلام';
-    const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
-    const messages = {
-      shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
-      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
-    };
-
-    // --- حفظ وقراءة الطلبات مع إمكانية التراجع ---
     function save(push=true){
       localStorage.setItem('ordersData', JSON.stringify(orders));
       if(push) pushHistory();
@@ -198,7 +199,12 @@
       if(d){ orders = JSON.parse(d); pushHistory(); render(); }
     }
 
-    // --- عرض الطلبات ---
+    function sortOrdersNumeric(list){
+      // جميع الطلبات بدون manualOrder ترتب افتراضياً في النهاية
+      list.forEach((o,i)=>{ if(!o.manualOrder) o.manualOrder = i+1; });
+      return list.sort((a,b)=> (parseInt(a.manualOrder||0) || 1)-(parseInt(b.manualOrder||0) || 1));
+    }
+
     function render(){
       const cont = document.getElementById('ordersContainer');
       cont.innerHTML = '';
@@ -207,77 +213,117 @@
       const q = document.getElementById('searchInput').value.trim().toLowerCase();
       if(q){
         list = list.filter(o=>
-          o['رقم الطلب'].toString().includes(q) ||
-          o['اسم العميل'].toLowerCase().includes(q)
+          (o['رقم الطلب']||"").toString().includes(q) ||
+          (o['اسم العميل']||"").toLowerCase().includes(q)
         );
       }
-      // ترتيب حسب رقم الترتيب اليدوي أو المضاف
-      list.sort((a,b)=> ((a.manualOrder||a.addedOrder||0) - (b.manualOrder||b.addedOrder||0)));
+      list = sortOrdersNumeric(list);
+
+      if(viewType === 'grid') cont.className = 'order-grid mb-4';
+      else cont.className = 'order-list mb-4';
+
       list.forEach((o,i)=>{
-        const num = o.manualOrder||o.addedOrder||i+1;
+        const num = o.manualOrder||i+1;
         const tel = (o['رقم الجوال']||"").replace(/\D/g,'');
         const cod = o['طريقة الدفع']===cashOnDelivery;
-        const card = document.createElement('div');
-        card.className = 'order-card position-relative'+(cod?' cod':'');
-        card.setAttribute('data-id', o['رقم الطلب']);
-        card.innerHTML = `
-          <input type="checkbox" class="form-check-input select-label"/>
-          <span class="order-number">
-            <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
-          </span>
-          <div class="card-border${cod?' cod':''}"></div>
-          <div class="d-flex justify-content-between mb-2">
-            <strong>#${o['رقم الطلب']}</strong>
-            ${cod?`<span class="badge bg-warning text-dark">عند الإستلام: ${o['إجمالي الطلب']} ريال</span>`:''}
-          </div>
-          <h5>${o['اسم العميل']}</h5>
-          <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']||''}</p>
-          <div class="mb-2" style="color:#888;">${o['ملاحظة']||''}</div>
-          <div class="d-flex mb-2">
-            <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
-            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
-            <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
-            <button class="btn btn-outline-secondary btn-sm ms-2 btn-print-label"><i class="bi bi-printer"></i></button>
-            <button class="btn btn-light btn-sm ms-2 btn-edit-order"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-light btn-sm ms-2 btn-delete-order"><i class="bi bi-trash"></i></button>
-          </div>
-          <div class="d-flex justify-content-between align-items-center">
-            <select class="form-select form-select-sm status-select" style="width:auto;">
-              ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
-            </select>
-          </div>`;
-        cont.appendChild(card);
-
-        card.querySelector('.status-select').addEventListener('change', e=>{
-          o.status=e.target.value; save();
-        });
-        card.querySelector('.order-input').addEventListener('change', e=>{
-          o.manualOrder=parseInt(e.target.value)||1; save();
-        });
-        card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
-        card.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
-        card.querySelector('.btn-delete-order').addEventListener('click', ()=>{
-          if(confirm("تأكيد حذف الطلب؟")){
-            orders = orders.filter(x=>x!==o); save();
-          }
-        });
+        if(viewType === 'grid') {
+          // شبكة
+          const card = document.createElement('div');
+          card.className = 'order-card position-relative'+(cod?' cod':'');
+          card.setAttribute('data-id', o['رقم الطلب']);
+          card.innerHTML = `
+            <input type="checkbox" class="form-check-input select-label"/>
+            <span class="order-number">
+              <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+            </span>
+            <div class="card-border${cod?' cod':''}"></div>
+            <div class="d-flex justify-content-between mb-2">
+              <strong>#${o['رقم الطلب']}</strong>
+              ${cod?`<span class="badge bg-warning text-dark">عند الإستلام: ${o['إجمالي الطلب']} ريال</span>`:''}
+            </div>
+            <h5>${o['اسم العميل']}</h5>
+            <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']||''}</p>
+            <div class="mb-2" style="color:#888;">${o['ملاحظة']||''}</div>
+            <div class="d-flex mb-2">
+              <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i></a>
+              <button class="btn btn-outline-secondary btn-sm ms-2 btn-print-label"><i class="bi bi-printer"></i></button>
+              <button class="btn btn-light btn-sm ms-2 btn-edit-order"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-light btn-sm ms-2 btn-delete-order"><i class="bi bi-trash"></i></button>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <select class="form-select form-select-sm status-select" style="width:auto;">
+                ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </div>`;
+          cont.appendChild(card);
+          card.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
+          card.querySelector('.order-input').addEventListener('change', e=>{
+            o.manualOrder=parseInt(e.target.value)||1; save(); render();
+          });
+          card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+          card.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
+          card.querySelector('.btn-delete-order').addEventListener('click', ()=>{
+            if(confirm('حذف هذا الطلب؟')){
+              orders=orders.filter(x=>x!==o);
+              save(); render();
+            }
+          });
+        } else {
+          // قائمة
+          const row = document.createElement('div');
+          row.className = 'order-list-row position-relative'+(cod?' cod':'');
+          row.setAttribute('data-id', o['رقم الطلب']);
+          row.innerHTML = `
+            <input type="checkbox" class="form-check-input select-label"/>
+            <span class="order-number">
+              <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+            </span>
+            <div class="order-info-list">
+              <strong>#${o['رقم الطلب']}</strong>
+              <span style="margin-right:10px;">${o['اسم العميل']}</span>
+              <span style="margin-right:10px;">${o['عنوان العميل']||''}</span>
+              <span style="margin-right:10px;color:#888;">${o['ملاحظة']||''}</span>
+            </div>
+            <div>
+              <button class="btn btn-outline-secondary btn-sm ms-1 btn-print-label"><i class="bi bi-printer"></i></button>
+              <button class="btn btn-light btn-sm ms-1 btn-edit-order"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-light btn-sm ms-1 btn-delete-order"><i class="bi bi-trash"></i></button>
+              <select class="form-select form-select-sm status-select" style="width:auto;display:inline-block;width:120px;">
+                ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </div>
+          `;
+          cont.appendChild(row);
+          row.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
+          row.querySelector('.order-input').addEventListener('change', e=>{
+            o.manualOrder=parseInt(e.target.value)||1; save(); render();
+          });
+          row.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+          row.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
+          row.querySelector('.btn-delete-order').addEventListener('click', ()=>{
+            if(confirm('حذف هذا الطلب؟')){
+              orders=orders.filter(x=>x!==o);
+              save(); render();
+            }
+          });
+        }
       });
-      if(!sortable) initSortable();
+      if(viewType === 'grid' && !sortable) initSortable();
     }
 
-    // --- السحب والترتيب اليدوي ---
     function initSortable(){
       sortable = Sortable.create(document.getElementById('ordersContainer'), { animation:150, disabled:true,
         onEnd: ()=>{
-          const ids = Array.from(document.querySelectorAll('.order-card')).map(c=>c.getAttribute('data-id'));
+          const ids = Array.from(document.querySelectorAll('.order-card'))
+            .map(c=>c.getAttribute('data-id'));
           orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
-          save();
-          render();
+          save(); render();
         }
       });
     }
 
-    // --- طباعة بوليصة واحدة ---
     function generateLabel(o){
       const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
       tpl.querySelector('[data-name]').textContent    = o['اسم العميل'];
@@ -308,10 +354,9 @@
       setTimeout(()=>win.print(),300);
     }
 
-    // --- طباعة البوليصات المختارة ---
     function printSelectedLabels(){
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
-        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+        .map(cb=>cb.closest(viewType==='grid'?'.order-card':'.order-list-row').getAttribute('data-id'));
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
@@ -347,7 +392,6 @@
       const r=new FileReader(); r.onload=evt=>{
         const wb=XLSX.read(evt.target.result,{type:'binary'});
         const ws=wb.Sheets[wb.SheetNames[0]];
-        // دمج الطلبات الجديدة مع القديمة دون حذفها
         const newOrders = XLSX.utils.sheet_to_json(ws,{defval:''})
           .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         orders = [...orders, ...newOrders];
@@ -363,11 +407,13 @@
       render();
     }));
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
-      sortable.option('disabled',!sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+      if(sortable) {
+        sortable.option('disabled',!sortable.option('disabled'));
+        document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+      }
     });
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
-      orders.sort((a,b)=> (a.manualOrder||0)-(b.manualOrder||0));
+      orders.forEach((o,i)=> o.manualOrder = i+1);
       save();
       render();
     });
@@ -399,7 +445,7 @@
     // حذف جماعي
     document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
-        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+        .map(cb=>cb.closest(viewType==='grid'?'.order-card':'.order-list-row').getAttribute('data-id'));
       if(!ids.length) return alert('اختر طلبات لحذفها');
       if(confirm("هل تريد حذف الطلبات المحددة؟")){
         orders = orders.filter(o=>!ids.includes(o['رقم الطلب'].toString()));
@@ -413,7 +459,7 @@
       const v = this.value;
       if(!v) return;
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
-        .map(cb=>cb.closest('.order-card').getAttribute('data-id'));
+        .map(cb=>cb.closest(viewType==='grid'?'.order-card':'.order-list-row').getAttribute('data-id'));
       if(!ids.length) return alert('اختر طلبات لتغيير حالتها');
       orders.forEach(o=>{
         if(ids.includes(o['رقم الطلب'].toString())) o.status=v;
@@ -484,9 +530,16 @@
       if(!val) return;
       const idx = orders.findIndex(o => o['رقم الطلب'] && o['رقم الطلب'].toString() === val);
       if(idx > -1){
-        document.querySelectorAll('.order-card')[idx].scrollIntoView({behavior:'smooth'});
+        document.querySelectorAll(viewType==='grid'?'.order-card':'.order-list-row')[idx].scrollIntoView({behavior:'smooth'});
         this.value = '';
       }
+    });
+
+    // --- تبديل العرض ---
+    document.getElementById('viewSwitchBtn').addEventListener('click', function(){
+      viewType = viewType === 'grid' ? 'list' : 'grid';
+      this.textContent = "العرض: " + (viewType === 'grid' ? "شبكة" : "قائمة");
+      render();
     });
 
     window.addEventListener('load', load);
