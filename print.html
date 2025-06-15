@@ -3,67 +3,56 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>توليد PDF عربي</title>
+  <title>PDF بخط عربي مضمّن</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://unpkg.com/jspdf-arabic/dist/jspdf-arabic.js"></script>
 </head>
-<body style="text-align: center; font-family: Arial, sans-serif;">
-  <h2>تجهيز البوليصات PDF (مع دعم اللغة العربية)...</h2>
-  <p id="status">الرجاء الانتظار قليلاً...</p>
+<body style="text-align:center; font-family:Arial,sans-serif;">
+  <h2>توليد PDF عربي باستخدام خط مضمّن</h2>
+  <p id="status">يتم الآن تجهيز الملف...</p>
 
 <script>
 (async function () {
   const orders = JSON.parse(localStorage.getItem("print_orders") || "[]");
   if (!orders.length) {
-    document.getElementById("status").textContent = "لا توجد طلبات مختارة للطباعة.";
+    document.getElementById("status").textContent = "لا توجد طلبات.";
     return;
   }
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [95, 145] });
 
-  if (typeof doc.useArabic !== "function") {
-    document.getElementById("status").textContent = "خطأ: مكتبة jspdf-arabic لم تُحمّل بشكل صحيح.";
-    return;
-  }
-
-  doc.useArabic(); // تفعيل دعم العربية
+  // خط Amiri وهمي (placeholder - سيتم استبداله لاحقًا)
+  const amiriFontBase64 = "BASE64_FAKE_FONT_DATA";
+  doc.addFileToVFS("Amiri-Regular.ttf", amiriFontBase64);
+  doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+  doc.setFont("Amiri");
 
   orders.forEach((o, i) => {
     if (i > 0) doc.addPage();
 
-    doc.setDrawColor(0);
-    doc.rect(5, 5, 85, 135);
-
-    doc.setFontSize(14);
-    doc.text("واحة التقنية اكسبريس", 75, 15, { align: "right" });
-    doc.setFontSize(10);
-    doc.text("منطقة الرياض، حريملاء", 75, 21, { align: "right" });
-    doc.text("جوال: 0506071823", 75, 27, { align: "right" });
-
-    doc.setFillColor(0, 0, 0);
-    doc.setTextColor(255, 255, 255);
-    doc.rect(10, 10, 20, 10, 'F');
-    doc.text("COD", 20, 17, { align: "center" });
-
-    doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
-    let y = 40;
-    doc.text(`العميل: ${o['اسم العميل'] || ''}`, 75, y, { align: "right" }); y += 7;
-    doc.text(`رقم الطلب: ${o['رقم الطلب'] || ''}`, 75, y, { align: "right" }); y += 7;
-    doc.text(`جوال: ${o['رقم الجوال'] || ''}`, 75, y, { align: "right" }); y += 7;
-    doc.text(`العنوان: ${o['عنوان العميل'] || ''}`, 75, y, { align: "right" }); y += 7;
+    let y = 20;
+
+    doc.text("واحة التقنية اكسبريس", 75, y, { align: "right" }); y += 6;
+    doc.text("منطقة الرياض، حريملاء", 75, y, { align: "right" }); y += 6;
+    doc.text("جوال: 0506071823", 75, y, { align: "right" }); y += 12;
+
+    doc.setFontSize(10);
+    doc.text("العميل: " + (o['اسم العميل'] || ""), 75, y, { align: "right" }); y += 6;
+    doc.text("رقم الطلب: " + (o['رقم الطلب'] || ""), 75, y, { align: "right" }); y += 6;
+    doc.text("الجوال: " + (o['رقم الجوال'] || ""), 75, y, { align: "right" }); y += 6;
+    doc.text("العنوان: " + (o['عنوان العميل'] || ""), 75, y, { align: "right" }); y += 6;
     if (o['ملاحظة']) {
-      doc.text(`ملاحظة: ${o['ملاحظة']}`, 75, y, { align: "right" }); y += 7;
+      doc.text("ملاحظة: " + o['ملاحظة'], 75, y, { align: "right" }); y += 6;
     }
 
-    doc.setFontSize(14);
-    doc.text(o['رقم الطلب'] || '', 75, 130, { align: "right" });
+    doc.setFontSize(12);
+    doc.text(o['رقم الطلب'] || '', 75, 135, { align: "right" });
   });
 
-  const fileName = `order_${orders[0]["رقم الطلب"] || "pdf"}.pdf`;
+  const fileName = "order_" + (orders[0]["رقم الطلب"] || "labels") + ".pdf";
   doc.save(fileName);
-  document.getElementById("status").textContent = "تم تحميل: " + fileName;
+  document.getElementById("status").textContent = "تم تحميل الملف: " + fileName;
 })();
 </script>
 </body>
