@@ -21,13 +21,15 @@
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
     .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
     .order-card.cod { background:#fff8e1; border-color:#ffc107; }
-    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:600;}
+    .order-number-box { position:absolute; top:10px; left:20px; display:flex; align-items:center;}
+    .order-number { background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:600; }
     .select-label { position:absolute; top:10px; right:10px; z-index:10; }
     .order-info i { margin-left:5px; }
     .order-list-row { display:flex; align-items:center; justify-content:space-between; border:1px solid #dee2e6; background:#fff; border-radius:.5rem; padding:12px 18px; margin-bottom:10px; }
     .order-list-row.cod { background:#fff8e1; border-color:#ffc107; }
     .order-info-list { flex:1; display:flex; align-items:center; gap:20px; }
-    .order-list-row .order-number { position:static; background:#f8f9fa; margin-left:10px; }
+    .order-list-row .order-number-box { position:static; margin-left:10px; }
+    .order-list-row .order-number { background:#f8f9fa; margin-left:10px; }
     .order-list-row .order-input { margin-left:5px; }
     .order-list-row .select-label { position:static; margin-left:10px; }
     .order-list-row .btn { margin-right:3px; }
@@ -47,25 +49,23 @@
     .label .cod-box { display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000; }
     .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
     .label .cod-box .amount { background:#000; color:#fff; font-weight:bold; }
-    .label .codes { display: flex; justify-content: center; align-items: center; gap: 4mm; margin-top: 4mm; padding: 0 8mm;}
+    .label .codes { display: flex; justify-content: center; align-items: center; gap: 6mm; margin-top: 6mm; padding: 0 10mm;}
     .label .barcode-wrapper { text-align:center;}
-    .label .barcode-wrapper svg { width:60mm; height:auto; }
+    .label .barcode-wrapper svg { width:56mm; height:auto; }
     .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
     .label .qrcode-area { width:28mm; height:28mm; background:#fff; display:flex;align-items:center;justify-content:center;}
     .label-note {color:#6c757d; font-size:12px; margin-top:2mm;}
-
-    /* التأكد من عدم تقطيع البوليصة */
+    /* منع التقطيع في الطباعة */
     @media print {
-      body { background: #fff !important; }
-      .label { page-break-after: always; }
-      .label:last-child { page-break-after: auto; }
+      html, body { width:100vw; height:100vh; background: #fff !important; }
+      .label { page-break-after: always; break-after:always; }
+      .label:last-child { page-break-after: auto; break-after:auto; }
       .container, .header, .controls, .status-filters { display:none !important; }
       #ordersContainer { margin:0 !important; }
     }
   </style>
 </head>
 <body>
-
   <!-- قالب بوليصة الشحن مع الشعار -->
   <template id="labelTemplate">
     <div class="label">
@@ -97,7 +97,6 @@
       </div>
     </div>
   </template>
-
   <!-- نافذة إضافة طلب جديد -->
   <div class="modal fade" id="addOrderModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -128,7 +127,6 @@
       </form>
     </div>
   </div>
-
   <div class="container">
     <div class="header">
       <h1 class="text-primary">منظم طلبات التوصيل</h1>
@@ -167,24 +165,17 @@
     </div>
     <div id="ordersContainer" class="order-grid mb-4"></div>
   </div>
-
   <script>
     let orders = [], sortable = null, filterStatus = '', viewType = 'grid';
     const cashOnDelivery = 'الدفع عند الاستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const history = [], future = [];
-    // رسائل واتساب
     const messages = {
       shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
       arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
-
-    // حفظ واستعادة
     function save() { localStorage.setItem('ordersData', JSON.stringify(orders)); history.push(JSON.stringify(orders)); }
-    function load() {
-      const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }
-    }
-
+    function load() { const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); } }
     function render(){
       const cont = document.getElementById('ordersContainer');
       cont.innerHTML = '';
@@ -197,7 +188,6 @@
           (o['اسم العميل']||'').toLowerCase().includes(q)
         );
       }
-      // الترتيب حسب manualOrder ثم رقم الطلب
       list.sort((a,b)=>((a.manualOrder||orders.indexOf(a)+1)-(b.manualOrder||orders.indexOf(b)+1))||((a['رقم الطلب']||'')-(b['رقم الطلب']||'')));
       if(viewType === 'grid'){
         cont.className = 'order-grid mb-4';
@@ -210,8 +200,10 @@
           card.setAttribute('data-id', o['رقم الطلب']);
           card.innerHTML = `
             <input type="checkbox" class="form-check-input select-label"/>
-            <span class="order-number">
-              <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+            <span class="order-number-box">
+              <span class="order-number">
+                <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+              </span>
             </span>
             <div class="d-flex justify-content-between mb-2">
               <strong>#${o['رقم الطلب']||''}</strong>
@@ -258,8 +250,10 @@
           row.setAttribute('data-id', o['رقم الطلب']);
           row.innerHTML = `
             <input type="checkbox" class="form-check-input select-label"/>
-            <span class="order-number">
-              <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+            <span class="order-number-box">
+              <span class="order-number">
+                <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+              </span>
             </span>
             <div class="order-info-list">
               <strong>#${o['رقم الطلب']||''}</strong>
@@ -294,7 +288,6 @@
         });
       }
     }
-
     function initSortable(){
       if(sortable) sortable.destroy();
       sortable = Sortable.create(document.getElementById('ordersContainer'), {
@@ -307,7 +300,6 @@
         }
       });
     }
-
     // طباعة بوليصة واحدة
     function generateLabel(o){
       const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
@@ -335,7 +327,6 @@
       win.document.close();
       setTimeout(()=>win.print(),300);
     }
-
     // طباعة بوليصات مختارة
     function printSelectedLabels(){
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
@@ -368,7 +359,6 @@
       win.document.close();
       setTimeout(()=>win.print(),300);
     }
-
     // إضافة طلب جديد
     document.getElementById('addOrderBtn').addEventListener('click', ()=> {
       document.getElementById('addOrderForm').reset();
@@ -381,7 +371,6 @@
       save(); render();
       bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
     });
-
     // تحرير الطلب
     function editOrder(o){
       document.getElementById('addOrderForm').reset();
@@ -399,7 +388,6 @@
         this.onsubmit = null;
       }
     }
-
     // حذف المحدد
     document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
       const ids = Array.from(document.querySelectorAll('.select-label:checked'))
@@ -409,7 +397,6 @@
         save(); render();
       }
     });
-
     // تغيير حالة مجموعة
     document.getElementById('bulkStatus').addEventListener('change', function(){
       if(!this.value) return;
@@ -420,7 +407,6 @@
       save(); render();
       this.selectedIndex = 0;
     });
-
     // تصدير Excel
     document.getElementById('exportBtn').addEventListener('click', ()=>{
       if(!orders.length) return alert('لا توجد بيانات للتصدير');
@@ -433,7 +419,6 @@
       XLSX.utils.book_append_sheet(wb,ws,'Orders');
       XLSX.writeFile(wb,'Orders_export.xlsx');
     });
-
     // رفع ملف
     document.getElementById('fileInput').addEventListener('change', function(){
       const f=this.files[0]; if(!f) return;
@@ -442,53 +427,36 @@
         const ws=wb.Sheets[wb.SheetNames[0]];
         let newOrders = XLSX.utils.sheet_to_json(ws,{defval:''})
           .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
-        // دمج مع الطلبات الحالية
         orders = orders.concat(newOrders);
         save(); render();
       }; r.readAsBinaryString(f);
     });
-
-    // البحث
     document.getElementById('searchInput').addEventListener('input', render);
-
-    // الفلاتر
     document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       filterStatus = btn.getAttribute('data-status');
       render();
     }));
-
-    // الترتيب اليدوي
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
       sortable.option('disabled',!sortable.option('disabled'));
       document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
     });
-
-    // تطبيق الترقيم
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
       orders.forEach((o,i)=>o.manualOrder=i+1);
       save(); render();
     });
-
-    // تحديد الكل
     document.getElementById('selectAllBtn').addEventListener('click', ()=>{
       const boxes=Array.from(document.querySelectorAll('.select-label'));
       const anyUnchecked=boxes.some(cb=>!cb.checked);
       boxes.forEach(cb=>cb.checked=anyUnchecked);
     });
-
-    // طباعة
     document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
-
-    // مسح الكل
     document.getElementById('clearStorage').addEventListener('click', ()=>{
       if(confirm('سيتم مسح جميع الطلبات!')){
         localStorage.removeItem('ordersData'); orders=[]; render();
       }
     });
-
-    // تراجع/تقدم
     document.getElementById('undoBtn').addEventListener('click', ()=>{
       if(history.length>1){
         future.push(history.pop());
@@ -506,21 +474,22 @@
         render();
       }
     });
-
-    // تبديل نوع العرض
     document.getElementById('viewSwitchBtn').addEventListener('click', ()=>{
       viewType = (viewType==='grid'?'list':'grid');
       document.getElementById('viewTypeLabel').textContent = viewType==='grid'?'شبكة':'قائمة';
       render();
     });
-
-    // إدخال رقم عبر الماسح الضوئي
+    // ✅ إصلاح الماسح الضوئي: يعدّل الحالة مباشرة إذا كانت قيد الانتظار
     document.getElementById('scannerInput').addEventListener('keydown', function(e){
       if(e.key==="Enter"){
         const val=this.value.trim();
         if(val){
           const idx=orders.findIndex(x=>(x['رقم الطلب']||'').toString()===val);
           if(idx!==-1){
+            if(orders[idx].status==="قيد الانتظار"){
+              orders[idx].status = "جاري التوصيل";
+              save(); render();
+            }
             document.querySelectorAll('.order-card,.order-list-row')[idx]?.scrollIntoView({behavior:'smooth'});
             document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.add('table-primary');
             setTimeout(()=>document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.remove('table-primary'),2000);
@@ -529,10 +498,7 @@
         }
       }
     });
-
-    // تحميل تلقائي
     window.addEventListener('load', load);
-
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
