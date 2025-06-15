@@ -21,7 +21,7 @@
     .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
     .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
     .order-card.cod { background:#fff8e1; border-color:#ffc107; }
-    .order-number { position:absolute; top:10px; left:10px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:600;}
+    .order-number { position:absolute; top:10px; left:40px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:600;}
     .select-label { position:absolute; top:10px; right:10px; z-index:10; }
     .order-info i { margin-left:5px; }
     .order-list-row { display:flex; align-items:center; justify-content:space-between; border:1px solid #dee2e6; background:#fff; border-radius:.5rem; padding:12px 18px; margin-bottom:10px; }
@@ -35,7 +35,7 @@
     .order-list-row .form-select, .order-list-row input { font-size:14px; }
     .order-list-row .order-info-list > span { min-width:120px; word-break:break-all;}
     .order-list-row .order-info-list > strong {min-width:80px;}
-    @page { size:95mm 145mm; margin:0; }
+    @page { size: 95mm 145mm; margin: 0; }
 
     /* بوليصة الشحن */
     .label { width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; background:#fff; page-break-after:always;}
@@ -57,7 +57,7 @@
     /* التأكد من عدم تقطيع البوليصة */
     @media print {
       body { background: #fff !important; }
-      .label { page-break-after: always; page-break-inside: avoid; }
+      .label { page-break-after: always; page-break-inside: avoid; height: 145mm; overflow: hidden; }
       .label:last-child { page-break-after: auto; }
       .container, .header, .controls, .status-filters { display:none !important; }
       #ordersContainer { margin:0 !important; }
