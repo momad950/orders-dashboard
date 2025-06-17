@@ -86,6 +86,18 @@ input[type='checkbox'] {
 .checkbox-container .order-id {
   font-weight: bold;
 }
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.checkbox-container input[type='checkbox'] {
+  transform: scale(1.2);
+}
+.checkbox-container .order-id {
+  font-weight: bold;
+}
 </style>
 </head>
 <body>
@@ -232,7 +244,32 @@ input[type='checkbox'] {
           const card = document.createElement('div');
           card.className = 'order-card position-relative'+(cod?' cod':'');
           card.setAttribute('data-id', o['رقم الطلب']);
-          card.innerHTML = `
+
+          const topBar = document.createElement("div");
+          topBar.classList.add("d-flex", "justify-content-between", "mb-2", "align-items-center");
+
+          const orderId = document.createElement("strong");
+          orderId.textContent = "#" + o["رقم الطلب"];
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.classList.add("form-check-input", "select-label");
+
+          topBar.appendChild(orderId);
+          topBar.appendChild(checkbox);
+          card.appendChild(topBar);
+
+          // باقي محتوى البطاقة
+          const orderName = document.createElement("h5");
+          orderName.textContent = o["اسم العميل"] || "";
+          card.appendChild(orderName);
+
+          const orderAddress = document.createElement("p");
+          orderAddress.className = "order-info mb-2";
+          orderAddress.innerHTML = '<i class="bi bi-geo-alt-fill text-danger"></i> ' + (o["عنوان العميل"] || "");
+          card.appendChild(orderAddress);
+                
+
             <input type="checkbox" class="form-check-input select-label"/>
             <span class="order-number">
               <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
