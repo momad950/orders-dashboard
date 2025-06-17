@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+
+<html dir="rtl" lang="ar">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>منظم طلبات التوصيل</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>منظم طلبات التوصيل</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
     body { background: #f0f8ff; font-family: 'Tajawal', sans-serif;}
     .header { text-align:center; margin:20px 0; }
     .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
@@ -62,121 +63,124 @@
       .container, .header, .controls, .status-filters { display:none !important; }
       #ordersContainer { margin:0 !important; }
     }
-  </style>
+  
+input[type='checkbox'] {
+  transform: scale(1.2);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.order-id {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+</style>
 </head>
 <body>
-
-<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
-<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
-
-
-<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
-<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
-
-
-  <!-- قالب بوليصة الشحن مع الشعار -->
-  <template id="labelTemplate">
-    <div class="label">
-      <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
-      <div class="header">
-        <div class="cod-box">
-          <div class="title">الدفع عند الاستلام</div>
-          <div class="amount" data-cod></div>
-        </div>
-        <div class="company-info">
-          <div class="name">واحة التقنية اكسبريس</div>
-          <div>منطقة الرياض، حريملاء</div>
-          <div>جوال: 0506071823</div>
-        </div>
-      </div>
-      <div class="info-box">
-        <div class="line"><strong>العميل:</strong> <span data-name></span></div>
-        <div class="line"><strong>رقم الطلب:</strong> <span data-id></span></div>
-        <div class="line"><strong>جوال:</strong> <span data-phone></span></div>
-        <div class="line"><strong>العنوان:</strong> <span data-address></span></div>
-        <div class="line" data-note-line style="display:none;"><strong>ملاحظة:</strong> <span data-note></span></div>
-      </div>
-      <div class="codes">
-        <div class="barcode-wrapper">
-          <svg class="jsbarcode"></svg>
-          <div class="barcode-text" data-barcode-text></div>
-        </div>
-        <div class="qrcode-area" data-qr></div>
-      </div>
-    </div>
-  </template>
-
-  <!-- نافذة إضافة طلب جديد -->
-  <div class="modal fade" id="addOrderModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <form id="addOrderForm" class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">إضافة طلب جديد</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body row g-2">
-          <div class="col-md-6"><label>رقم الطلب</label><input name="رقم الطلب" required class="form-control"></div>
-          <div class="col-md-6"><label>اسم العميل</label><input name="اسم العميل" required class="form-control"></div>
-          <div class="col-md-6"><label>رقم الجوال</label><input name="رقم الجوال" required class="form-control"></div>
-          <div class="col-md-6"><label>العنوان</label><input name="عنوان العميل" required class="form-control"></div>
-          <div class="col-md-6">
-            <label>طريقة الدفع</label>
-            <select name="طريقة الدفع" class="form-select">
-              <option>الدفع عند الاستلام</option>
-              <option>مدفوع</option>
-              <option>تحويل بنكي</option>
-            </select>
-          </div>
-          <div class="col-md-6"><label>إجمالي الطلب</label><input name="إجمالي الطلب" required class="form-control"></div>
-          <div class="col-md-12"><label>ملاحظة</label><input name="ملاحظة" class="form-control"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary w-100">إضافة الطلب</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="container">
-    <div class="header">
-      <h1 class="text-primary">منظم طلبات التوصيل</h1>
-      <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
-    </div>
-    <div class="row controls">
-      <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
-      <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
-      <button id="addOrderBtn" class="btn btn-warning btn-sm col-auto">إضافة طلب جديد</button>
-      <button id="undoBtn" class="btn btn-light btn-sm col-auto" title="تراجع"><i class="bi bi-arrow-counterclockwise"></i></button>
-      <button id="redoBtn" class="btn btn-light btn-sm col-auto" title="تقدم"><i class="bi bi-arrow-clockwise"></i></button>
-      <button id="deleteSelectedBtn" class="btn btn-danger btn-sm col-auto">حذف المحدد</button>
-      <select id="bulkStatus" class="form-select form-select-sm col-auto" style="width:auto;display:inline-block;min-width:150px;">
-        <option value="">تغيير حالة الطلبات المحددة</option>
-        <option>قيد الانتظار</option>
-        <option>جاري التوصيل</option>
-        <option>تم التوصيل</option>
-        <option>مؤجل</option>
-        <option>مرفوض</option>
-      </select>
-      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
-      <button id="selectAllBtn" class="btn btn-outline-secondary btn-sm col-auto">تحديد الكل</button>
-      <button id="printSelectedBtn" class="btn btn-outline-primary btn-sm col-auto">طباعة بوليصات مختارة</button>
-      <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
-      <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
-      <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
-      <button id="viewSwitchBtn" class="btn btn-secondary btn-sm col-auto">العرض: <span id="viewTypeLabel">شبكة</span></button>
-    </div>
-    <div class="status-filters mb-3">
-      <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
-      <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
-      <button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل">جاري التوصيل</button>
-      <button class="btn btn-outline-success status-btn" data-status="تم التوصيل">تم التوصيل</button>
-      <button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
-      <button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
-    </div>
-    <div id="ordersContainer" class="order-grid mb-4"></div>
-  </div>
-
-  <script>
+<audio id="sound-success" preload="auto" src="https://www.soundjay.com/buttons/sounds/button-29.mp3"></audio>
+<audio id="sound-error" preload="auto" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+<audio id="sound-success" preload="auto" src="https://www.soundjay.com/buttons/sounds/button-29.mp3"></audio>
+<audio id="sound-error" preload="auto" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+<!-- قالب بوليصة الشحن مع الشعار -->
+<template id="labelTemplate">
+<div class="label">
+<img alt="شعار واحة التقنية" class="label-logo" src="logo.png"/>
+<div class="header">
+<div class="cod-box">
+<div class="title">الدفع عند الاستلام</div>
+<div class="amount" data-cod=""></div>
+</div>
+<div class="company-info">
+<div class="name">واحة التقنية اكسبريس</div>
+<div>منطقة الرياض، حريملاء</div>
+<div>جوال: 0506071823</div>
+</div>
+</div>
+<div class="info-box">
+<div class="line"><strong>العميل:</strong> <span data-name=""></span></div>
+<div class="line"><strong>رقم الطلب:</strong> <span data-id=""></span></div>
+<div class="line"><strong>جوال:</strong> <span data-phone=""></span></div>
+<div class="line"><strong>العنوان:</strong> <span data-address=""></span></div>
+<div class="line" data-note-line="" style="display:none;"><strong>ملاحظة:</strong> <span data-note=""></span></div>
+</div>
+<div class="codes">
+<div class="barcode-wrapper">
+<svg class="jsbarcode"></svg>
+<div class="barcode-text" data-barcode-text=""></div>
+</div>
+<div class="qrcode-area" data-qr=""></div>
+</div>
+</div>
+</template>
+<!-- نافذة إضافة طلب جديد -->
+<div class="modal fade" id="addOrderModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<form class="modal-content" id="addOrderForm">
+<div class="modal-header">
+<h5 class="modal-title">إضافة طلب جديد</h5>
+<button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+</div>
+<div class="modal-body row g-2">
+<div class="col-md-6"><label>رقم الطلب</label><input class="form-control" name="رقم الطلب" required=""/></div>
+<div class="col-md-6"><label>اسم العميل</label><input class="form-control" name="اسم العميل" required=""/></div>
+<div class="col-md-6"><label>رقم الجوال</label><input class="form-control" name="رقم الجوال" required=""/></div>
+<div class="col-md-6"><label>العنوان</label><input class="form-control" name="عنوان العميل" required=""/></div>
+<div class="col-md-6">
+<label>طريقة الدفع</label>
+<select class="form-select" name="طريقة الدفع">
+<option>الدفع عند الاستلام</option>
+<option>مدفوع</option>
+<option>تحويل بنكي</option>
+</select>
+</div>
+<div class="col-md-6"><label>إجمالي الطلب</label><input class="form-control" name="إجمالي الطلب" required=""/></div>
+<div class="col-md-12"><label>ملاحظة</label><input class="form-control" name="ملاحظة"/></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-primary w-100" type="submit">إضافة الطلب</button>
+</div>
+</form>
+</div>
+</div>
+<div class="container">
+<div class="header">
+<h1 class="text-primary">منظم طلبات التوصيل</h1>
+<input autofocus="" class="form-control scanner-input" id="scannerInput" placeholder="امسح رقم الطلب هنا"/>
+</div>
+<div class="row controls">
+<input accept=".xlsx,.xls" class="form-control col-auto" id="fileInput" type="file"/>
+<input class="form-control col-auto" id="searchInput" placeholder="ابحث برقم الطلب أو اسم العميل"/>
+<button class="btn btn-warning btn-sm col-auto" id="addOrderBtn">إضافة طلب جديد</button>
+<button class="btn btn-light btn-sm col-auto" id="undoBtn" title="تراجع"><i class="bi bi-arrow-counterclockwise"></i></button>
+<button class="btn btn-light btn-sm col-auto" id="redoBtn" title="تقدم"><i class="bi bi-arrow-clockwise"></i></button>
+<button class="btn btn-danger btn-sm col-auto" id="deleteSelectedBtn">حذف المحدد</button>
+<select class="form-select form-select-sm col-auto" id="bulkStatus" style="width:auto;display:inline-block;min-width:150px;">
+<option value="">تغيير حالة الطلبات المحددة</option>
+<option>قيد الانتظار</option>
+<option>جاري التوصيل</option>
+<option>تم التوصيل</option>
+<option>مؤجل</option>
+<option>مرفوض</option>
+</select>
+<button class="btn btn-success btn-sm col-auto" id="exportBtn">تصدير Excel</button>
+<button class="btn btn-outline-secondary btn-sm col-auto" id="selectAllBtn">تحديد الكل</button>
+<button class="btn btn-outline-primary btn-sm col-auto" id="printSelectedBtn">طباعة بوليصات مختارة</button>
+<button class="btn btn-info btn-sm col-auto" id="manualSortBtn">تمكين الترتيب اليدوي</button>
+<button class="btn btn-primary btn-sm col-auto" id="applyNumberBtn">تطبيق الترقيم</button>
+<button class="btn btn-danger btn-sm col-auto" id="clearStorage">مسح البيانات</button>
+<button class="btn btn-secondary btn-sm col-auto" id="viewSwitchBtn">العرض: <span id="viewTypeLabel">شبكة</span></button>
+</div>
+<div class="status-filters mb-3">
+<button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
+<button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
+<button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل">جاري التوصيل</button>
+<button class="btn btn-outline-success status-btn" data-status="تم التوصيل">تم التوصيل</button>
+<button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
+<button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
+</div>
+<div class="order-grid mb-4" id="ordersContainer"></div>
+</div>
+<script>
     let orders = [], sortable = null, filterStatus = '', viewType = 'grid';
     const cashOnDelivery = 'الدفع عند الاستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
@@ -553,6 +557,6 @@
     window.addEventListener('load', load);
 
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
