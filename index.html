@@ -1,1927 +1,557 @@
-import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore';
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>منظم طلبات التوصيل</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    body { background: #f0f8ff; font-family: 'Tajawal', sans-serif;}
+    .header { text-align:center; margin:20px 0; }
+    .scanner-input { display:block; margin:10px auto; width:300px; opacity:.7; }
+    .controls .form-control, .controls .btn { margin:5px 4px; }
+    .status-filters { text-align:center; margin-bottom:15px; }
+    .status-filters .btn { margin:0 5px; min-width:100px; }
+    .status-filters .active { box-shadow: inset 0 0 5px #00000033; }
+    .order-grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
+    .order-card { background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:15px; position:relative; }
+    .order-card.cod { background:#fff8e1; border-color:#ffc107; }
+    .order-number { position:absolute; top:10px; left:40px; background:#f8f9fa; padding:2px 8px; border-radius:.25rem; font-weight:600;}
+    .select-label { position:absolute; top:10px; right:10px; z-index:10; }
+    .order-info i { margin-left:5px; }
+    .order-list-row { display:flex; align-items:center; justify-content:space-between; border:1px solid #dee2e6; background:#fff; border-radius:.5rem; padding:12px 18px; margin-bottom:10px; }
+    .order-list-row.cod { background:#fff8e1; border-color:#ffc107; }
+    .order-info-list { flex:1; display:flex; align-items:center; gap:20px; }
+    .order-list-row .order-number { position:static; background:#f8f9fa; margin-left:10px; }
+    .order-list-row .order-input { margin-left:5px; }
+    .order-list-row .select-label { position:static; margin-left:10px; }
+    .order-list-row .btn { margin-right:3px; }
+    .order-list-row .status-select { margin-right:3px; }
+    .order-list-row .form-select, .order-list-row input { font-size:14px; }
+    .order-list-row .order-info-list > span { min-width:120px; word-break:break-all;}
+    .order-list-row .order-info-list > strong {min-width:80px;}
+    @page { size: 95mm 145mm; margin: 0; }
 
-// Global Constants for readability and easy modification
-const CASH_ON_DELIVERY_METHOD = 'عند الاستلام';
-const ORDER_STATUSES = ['قيد الانتظار', 'جاري التوصيل', 'تم التوصيل', 'مؤجل', 'مرفوض'];
-const WHATSAPP_MESSAGES = {
-  shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
-  arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
-};
-const COMPANY_INFO = {
-  name: 'واحة التقنية اكسبريس',
-  location: 'منطقة الرياض، حريملاء',
-  phone: '0506071823',
-  logo: 'logo.png' // Assuming logo.png is in the public directory
-};
+    /* بوليصة الشحن */
+    .label { width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; background:#fff; page-break-after:always;}
+    .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
+    .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
+    .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
+    .label .info-box { margin:2mm 0; }
+    .label .info-box .line { margin-bottom:1mm; }
+    .label .cod-box { display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000; }
+    .label .cod-box .title, .label .cod-box .amount { flex:1; line-height:10mm; }
+    .label .cod-box .amount { background:#000; color:#fff; font-weight:bold; }
+    .label .codes { display: flex; justify-content: center; align-items: center; gap: 4mm; margin-top: 4mm; padding: 0 8mm;}
+    .label .barcode-wrapper { text-align:center;}
+    .label .barcode-wrapper svg { width:60mm; height:auto; }
+    .label .barcode-text { margin-top:1mm; font-size:12pt; font-weight:bold; }
+    .label .qrcode-area { width:28mm; height:28mm; background:#fff; display:flex;align-items:center;justify-content:center;}
+    .label-note {color:#6c757d; font-size:12px; margin-top:2mm;}
 
-// Firebase Context and Provider
-const FirebaseContext = createContext(null);
-
-const FirebaseProvider = ({ children }) => {
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-
-  useEffect(() => {
-    try {
-      const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-      const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
-
-      const app = initializeApp(firebaseConfig);
-      const firestore = getFirestore(app);
-      const firebaseAuth = getAuth(app);
-
-      setDb(firestore);
-      setAuth(firebaseAuth);
-
-      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          try {
-            if (initialAuthToken) {
-              await signInWithCustomToken(firebaseAuth, initialAuthToken);
-            } else {
-              await signInAnonymously(firebaseAuth);
-            }
-          } catch (error) {
-            console.error("Firebase Auth Error:", error);
-            setUserId(crypto.randomUUID());
-          }
-        }
-        setIsAuthReady(true);
-      });
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Failed to initialize Firebase:", error);
-      setIsAuthReady(true);
-      setUserId(crypto.randomUUID());
+    /* التأكد من عدم تقطيع البوليصة */
+    @media print {
+      body { background: #fff !important; }
+      .label { page-break-after: always; page-break-inside: avoid; height: 145mm; overflow: hidden; }
+      .label:last-child { page-break-after: auto; }
+      .container, .header, .controls, .status-filters { display:none !important; }
+      #ordersContainer { margin:0 !important; }
     }
-  }, []);
+  </style>
+</head>
+<body>
 
-  return (
-    <FirebaseContext.Provider value={{ db, auth, userId, isAuthReady }}>
-      {children}
-    </FirebaseContext.Provider>
-  );
-};
+<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
+<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
 
-const useFirebase = () => useContext(FirebaseContext);
 
-// Utility function to get status color
-const getStatusColor = (status) => {
-  switch (status) {
-    case 'قيد الانتظار': return 'bg-yellow-100 text-yellow-800';
-    case 'جاري التوصيل': return 'bg-blue-100 text-blue-800';
-    case 'تم التوصيل': return 'bg-green-100 text-green-800';
-    case 'مؤجل': return 'bg-gray-100 text-gray-800';
-    case 'مرفوض': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
+<audio id="sound-success" src="https://www.soundjay.com/buttons/sounds/button-29.mp3" preload="auto"></audio>
+<audio id="sound-error" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
 
-// Custom Message Box component (used for alerts and confirmations)
-const MessageBox = ({ message, type = 'info', onClose, onConfirm }) => {
-  const bgColor = type === 'error' ? 'bg-red-100 text-red-700' :
-                  type === 'success' ? 'bg-green-100 text-green-700' :
-                  'bg-blue-100 text-blue-700';
 
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-auto text-center animate-fade-in-up">
-        <p className={`text-lg mb-6 ${bgColor} p-3 rounded-lg border border-gray-200`}>{message}</p>
-        <div className="flex justify-center gap-4">
-          {onConfirm && (
-            <button
-              onClick={onConfirm}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-5 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md"
-            >
-              نعم
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="bg-gray-400 hover:bg-gray-500 text-gray-800 font-bold py-2 px-5 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md"
-          >
-            {onConfirm ? 'إلغاء' : 'موافق'}
-          </button>
+  <!-- قالب بوليصة الشحن مع الشعار -->
+  <template id="labelTemplate">
+    <div class="label">
+      <img class="label-logo" src="logo.png" alt="شعار واحة التقنية">
+      <div class="header">
+        <div class="cod-box">
+          <div class="title">الدفع عند الاستلام</div>
+          <div class="amount" data-cod></div>
+        </div>
+        <div class="company-info">
+          <div class="name">واحة التقنية اكسبريس</div>
+          <div>منطقة الرياض، حريملاء</div>
+          <div>جوال: 0506071823</div>
         </div>
       </div>
-    </div>
-  );
-};
-
-// App Header Component
-const AppHeader = ({ userId }) => (
-  <div className="w-full text-center mb-10 p-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-b-3xl shadow-xl">
-    <h1 className="text-5xl font-extrabold mb-3 leading-tight animate-fade-in-down">منظم طلبات التوصيل</h1>
-    <p className="text-xl opacity-90 animate-fade-in-up">أداة شاملة لإدارة شحناتك بكفاءة وسهولة.</p>
-    {userId && (
-      <p className="text-sm mt-4 opacity-80">
-        معرف المستخدم الحالي: <span dir="ltr" className="font-mono text-blue-100 break-words font-semibold">{userId}</span>
-      </p>
-    )}
-  </div>
-);
-
-// Scanner Input Component - now handles scanning logic and sound
-const ScannerInput = ({ orders, updateOrderStatus, displayMessage, playSound }) => {
-  const scannerInputRef = useRef(null);
-
-  const handleScan = async (e) => {
-    if (e.key === 'Enter') {
-      const scannedOrderId = e.target.value.trim();
-      if (!scannedOrderId) {
-        displayMessage("الرجاء إدخال رقم طلب صالح.", "error");
-        playSound('fail');
-        return;
-      }
-
-      const orderToUpdate = orders.find(order => order.orderId?.toString() === scannedOrderId);
-
-      if (orderToUpdate) {
-        if (orderToUpdate.status === 'قيد الانتظار') {
-          await updateOrderStatus(orderToUpdate.id, 'جاري التوصيل');
-          displayMessage(`تم تحديث حالة الطلب #${scannedOrderId} إلى "جاري التوصيل".`, "success");
-          playSound('success');
-        } else {
-          displayMessage(`الطلب #${scannedOrderId} حالته بالفعل "${orderToUpdate.status}".`, "info");
-          playSound('fail');
-        }
-      } else {
-        displayMessage(`لم يتم العثور على الطلب برقم #${scannedOrderId}.`, "error");
-        playSound('fail');
-      }
-      e.target.value = ''; // Clear input field after scan
-    }
-  };
-
-  useEffect(() => {
-    if (scannerInputRef.current) {
-      scannerInputRef.current.focus(); // Keep focus on scanner input
-    }
-  }, [orders]); // Refocus whenever orders change to maintain focus
-
-  return (
-    <input
-      id="scannerInput"
-      ref={scannerInputRef}
-      className="block p-4 border border-gray-300 rounded-full w-full max-w-md mx-auto mb-8 text-center text-gray-700 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out shadow-lg"
-      placeholder="امسح رقم الطلب هنا..."
-      autoFocus
-      dir="ltr"
-      onKeyDown={handleScan} // Use onKeyDown to capture Enter
-    />
-  );
-};
-
-
-// Order Form Component - now accepts an onClose prop
-const OrderForm = ({ addOrder, onClose }) => {
-  const [customerName, setCustomerName] = useState('');
-  const [address, setAddress] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [totalAmount, setTotalAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('info');
-  const [showMessageBox, setShowMessageBox] = useState(false);
-
-  const displayMessage = (msg, type = 'info') => {
-    setMessage(msg);
-    setMessageType(type);
-    setShowMessageBox(true);
-  };
-
-  const handleCloseMessageBox = () => {
-    setShowMessageBox(false);
-    if (messageType === 'success') {
-      onClose(); // Close modal on success
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!customerName || !address || !phoneNumber || !orderId || !paymentMethod || totalAmount === '') {
-      displayMessage("الرجاء ملء جميع الحقول المطلوبة.", "error");
-      return;
-    }
-    // Attempt to add the order, will be checked for duplicates in MainAppContent
-    const success = await addOrder({
-      customerName,
-      address,
-      phoneNumber,
-      orderId,
-      paymentMethod,
-      totalAmount: parseFloat(totalAmount),
-      status: 'قيد الانتظار',
-      manualOrder: null
-    });
-
-    if (success) {
-      setCustomerName('');
-      setAddress('');
-      setPhoneNumber('');
-      setOrderId('');
-      setPaymentMethod('');
-      setTotalAmount('');
-      displayMessage("تم إضافة الطلب بنجاح!", "success");
-    }
-    // If not successful, displayMessage would have been called by addOrder
-  };
-
-  return (
-    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-4xl border border-gray-100">
-      <h2 className="text-3xl font-bold mb-6 text-gray-800 text-right">إضافة طلب توصيل جديد</h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <input
-            type="text"
-            placeholder="اسم العميل"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="rtl"
-            required
-          />
-          <input
-            type="text"
-            placeholder="عنوان التوصيل"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="rtl"
-            required
-          />
-          <input
-            type="tel"
-            placeholder="رقم الهاتف"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="ltr"
-            required
-          />
-          <input
-            type="text"
-            placeholder="رقم الطلب"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="ltr"
-            required
-          />
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="rtl"
-            required
-          >
-            <option value="">طريقة الدفع</option>
-            <option value="عند الاستلام">الدفع عند الاستلام</option>
-            <option value="مدفوع مسبقا">مدفوع مسبقا</option>
-          </select>
-          <input
-            type="number"
-            placeholder="إجمالي الطلب (ريال)"
-            value={totalAmount}
-            onChange={(e) => setTotalAmount(e.target.value)}
-            className="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-right shadow-sm"
-            dir="ltr"
-            step="0.01"
-            required
-          />
+      <div class="info-box">
+        <div class="line"><strong>العميل:</strong> <span data-name></span></div>
+        <div class="line"><strong>رقم الطلب:</strong> <span data-id></span></div>
+        <div class="line"><strong>جوال:</strong> <span data-phone></span></div>
+        <div class="line"><strong>العنوان:</strong> <span data-address></span></div>
+        <div class="line" data-note-line style="display:none;"><strong>ملاحظة:</strong> <span data-note></span></div>
+      </div>
+      <div class="codes">
+        <div class="barcode-wrapper">
+          <svg class="jsbarcode"></svg>
+          <div class="barcode-text" data-barcode-text></div>
         </div>
-        <button
-          type="submit"
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
-        >
-          إضافة طلب
-        </button>
-      </form>
-      {showMessageBox && (
-        <MessageBox message={message} type={messageType} onClose={handleCloseMessageBox} />
-      )}
+        <div class="qrcode-area" data-qr></div>
+      </div>
     </div>
-  );
-};
+  </template>
 
-// Message Generator Modal Component
-const MessageGeneratorModal = ({ order, onClose }) => {
-  const [messageType, setMessageType] = useState('Order Confirmation');
-  const [customContext, setCustomContext] = useState('');
-  const [generatedMessage, setGeneratedMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [copyStatus, setCopyStatus] = useState('');
-
-  const generateMessageWithLLM = async () => {
-    setIsLoading(true);
-    setGeneratedMessage('');
-    setCopyStatus('');
-
-    const prompt = `
-      Generate a concise and polite WhatsApp message in Arabic for a customer of "واحة التقنية اكسبريس".
-      Customer Name: ${order.customerName}
-      Order ID: ${order.orderId}
-      Current Status: ${order.status}
-      Payment Method: ${order.paymentMethod}
-      Total Amount: ${order.totalAmount} SAR
-      Message Type: ${messageType}
-      Additional Context from user: ${customContext || 'لا يوجد سياق إضافي.'}
-
-      Consider the following scenarios for message generation:
-      - "Order Confirmation": Confirm the order has been received and will be processed.
-      - "Delivery Delay": Inform the customer about a delay and apologize. Ask for understanding.
-      - "Ready for Delivery": Inform the customer their order is ready for delivery and ask for location/availability.
-      - "General Inquiry": A general message for any other customer service need.
-
-      The message should start with a greeting and end with a polite closing from "فريق واحة التقنية اكسبريس".
-    `;
-
-    try {
-      let chatHistory = [];
-      chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-      const payload = { contents: chatHistory };
-      const apiKey = ""; // Leave as-is, Canvas will inject at runtime
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-      if (result.candidates && result.candidates.length > 0 &&
-          result.candidates[0].content && result.candidates[0].content.parts &&
-          result.candidates[0].content.parts.length > 0) {
-        setGeneratedMessage(result.candidates[0].content.parts[0].text);
-      } else {
-        setGeneratedMessage("تعذر إنشاء الرسالة. الرجاء المحاولة مرة أخرى.");
-        console.error("Gemini API returned an unexpected structure or no content:", result);
-      }
-    } catch (error) {
-      console.error("Error calling Gemini API:", error);
-      setGeneratedMessage("حدث خطأ أثناء الاتصال بخدمة الذكاء الاصطناعي. الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const copyToClipboard = () => {
-    if (generatedMessage) {
-      try {
-        // Use document.execCommand('copy') as navigator.clipboard.writeText() might not work in iframes
-        const textarea = document.createElement('textarea');
-        textarea.value = generatedMessage;
-        textarea.style.position = 'fixed'; // Avoid scrolling to bottom
-        textarea.style.opacity = '0'; // Hide
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        setCopyStatus('تم النسخ!');
-        setTimeout(() => setCopyStatus(''), 2000); // Clear status after 2 seconds
-      } catch (err) {
-        console.error('Failed to copy text: ', err);
-        setCopyStatus('فشل النسخ.');
-      }
-    }
-  };
-
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-2xl mx-auto animate-fade-in-up relative border border-gray-100">
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 text-gray-600 hover:text-gray-900 text-3xl font-bold"
-        >
-          &times;
-        </button>
-        <h2 className="text-3xl font-bold mb-6 text-gray-800 text-right">✨ مساعد الرسائل الذكي للعميل</h2>
-
-        <div className="space-y-4 mb-6">
-          <div className="text-right">
-            <label htmlFor="messageType" className="block text-gray-700 text-sm font-bold mb-2">نوع الرسالة:</label>
-            <select
-              id="messageType"
-              value={messageType}
-              onChange={(e) => setMessageType(e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full text-right shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              dir="rtl"
-            >
-              <option value="Order Confirmation">تأكيد الطلب</option>
-              <option value="Delivery Delay">تأخير التوصيل</option>
-              <option value="Ready for Delivery">جاهز للتوصيل</option>
-              <option value="General Inquiry">استفسار عام</option>
+  <!-- نافذة إضافة طلب جديد -->
+  <div class="modal fade" id="addOrderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <form id="addOrderForm" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">إضافة طلب جديد</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-2">
+          <div class="col-md-6"><label>رقم الطلب</label><input name="رقم الطلب" required class="form-control"></div>
+          <div class="col-md-6"><label>اسم العميل</label><input name="اسم العميل" required class="form-control"></div>
+          <div class="col-md-6"><label>رقم الجوال</label><input name="رقم الجوال" required class="form-control"></div>
+          <div class="col-md-6"><label>العنوان</label><input name="عنوان العميل" required class="form-control"></div>
+          <div class="col-md-6">
+            <label>طريقة الدفع</label>
+            <select name="طريقة الدفع" class="form-select">
+              <option>الدفع عند الاستلام</option>
+              <option>مدفوع</option>
+              <option>تحويل بنكي</option>
             </select>
           </div>
-
-          <div className="text-right">
-            <label htmlFor="customContext" className="block text-gray-700 text-sm font-bold mb-2">سياق إضافي (اختياري):</label>
-            <textarea
-              id="customContext"
-              rows="3"
-              placeholder="مثال: السيارة تعطلت، أو نحتاج تأكيد الموقع الدقيق."
-              value={customContext}
-              onChange={(e) => setCustomContext(e.target.value)}
-              className="p-3 border border-gray-300 rounded-lg w-full text-right shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              dir="rtl"
-            ></textarea>
-          </div>
-
-          <button
-            onClick={generateMessageWithLLM}
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white ml-2"></div>
-                جاري الإنشاء...
-              </>
-            ) : (
-              <>
-                <i className="bi bi-magic ml-2"></i> إنشاء رسالة ✨
-              </>
-            )}
-          </button>
+          <div class="col-md-6"><label>إجمالي الطلب</label><input name="إجمالي الطلب" required class="form-control"></div>
+          <div class="col-md-12"><label>ملاحظة</label><input name="ملاحظة" class="form-control"></div>
         </div>
-
-        {generatedMessage && (
-          <div className="border border-gray-200 bg-gray-50 p-4 rounded-lg text-right relative">
-            <h3 className="text-xl font-bold text-gray-800 mb-3">الرسالة المقترحة:</h3>
-            <p dir="rtl" className="text-gray-700 whitespace-pre-wrap leading-relaxed">{generatedMessage}</p>
-            <button
-              onClick={copyToClipboard}
-              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md transform hover:scale-105 flex items-center justify-center w-full"
-            >
-              <i className="bi bi-clipboard ml-2"></i> {copyStatus || 'نسخ الرسالة'}
-            </button>
-            <a
-              href={`https://wa.me/${order.phoneNumber?.replace(/\D/g, '')}?text=${encodeURIComponent(generatedMessage)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md transform hover:scale-105 flex items-center justify-center w-full"
-            >
-              <i className="bi bi-whatsapp ml-2"></i> إرسال عبر واتساب
-            </a>
-          </div>
-        )}
-      </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary w-100">إضافة الطلب</button>
+        </div>
+      </form>
     </div>
-  );
-};
+  </div>
 
+  <div class="container">
+    <div class="header">
+      <h1 class="text-primary">منظم طلبات التوصيل</h1>
+      <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
+    </div>
+    <div class="row controls">
+      <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
+      <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
+      <button id="addOrderBtn" class="btn btn-warning btn-sm col-auto">إضافة طلب جديد</button>
+      <button id="undoBtn" class="btn btn-light btn-sm col-auto" title="تراجع"><i class="bi bi-arrow-counterclockwise"></i></button>
+      <button id="redoBtn" class="btn btn-light btn-sm col-auto" title="تقدم"><i class="bi bi-arrow-clockwise"></i></button>
+      <button id="deleteSelectedBtn" class="btn btn-danger btn-sm col-auto">حذف المحدد</button>
+      <select id="bulkStatus" class="form-select form-select-sm col-auto" style="width:auto;display:inline-block;min-width:150px;">
+        <option value="">تغيير حالة الطلبات المحددة</option>
+        <option>قيد الانتظار</option>
+        <option>جاري التوصيل</option>
+        <option>تم التوصيل</option>
+        <option>مؤجل</option>
+        <option>مرفوض</option>
+      </select>
+      <button id="exportBtn" class="btn btn-success btn-sm col-auto">تصدير Excel</button>
+      <button id="selectAllBtn" class="btn btn-outline-secondary btn-sm col-auto">تحديد الكل</button>
+      <button id="printSelectedBtn" class="btn btn-outline-primary btn-sm col-auto">طباعة بوليصات مختارة</button>
+      <button id="manualSortBtn" class="btn btn-info btn-sm col-auto">تمكين الترتيب اليدوي</button>
+      <button id="applyNumberBtn" class="btn btn-primary btn-sm col-auto">تطبيق الترقيم</button>
+      <button id="clearStorage" class="btn btn-danger btn-sm col-auto">مسح البيانات</button>
+      <button id="viewSwitchBtn" class="btn btn-secondary btn-sm col-auto">العرض: <span id="viewTypeLabel">شبكة</span></button>
+    </div>
+    <div class="status-filters mb-3">
+      <button class="btn btn-outline-dark status-btn active" data-status="">الكل</button>
+      <button class="btn btn-outline-secondary status-btn" data-status="قيد الانتظار">قيد الانتظار</button>
+      <button class="btn btn-outline-warning status-btn" data-status="جاري التوصيل">جاري التوصيل</button>
+      <button class="btn btn-outline-success status-btn" data-status="تم التوصيل">تم التوصيل</button>
+      <button class="btn btn-outline-info status-btn" data-status="مؤجل">مؤجل</button>
+      <button class="btn btn-outline-danger status-btn" data-status="مرفوض">مرفوض</button>
+    </div>
+    <div id="ordersContainer" class="order-grid mb-4"></div>
+  </div>
 
-// Order Card Component - Updated to include the new LLM message button AND list view
-const OrderCard = ({ order, updateOrderStatus, deleteOrder, generateLabel, updateOrderManualNumber, onSelectOrder, isSelected, onOpenMessageGenerator, viewMode }) => {
-  const [showMessageBox, setShowMessageBox] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('info');
-  const [manualOrderValue, setManualOrderValue] = useState(order.manualOrder || '');
+  <script>
+    let orders = [], sortable = null, filterStatus = '', viewType = 'grid';
+    const cashOnDelivery = 'الدفع عند الاستلام';
+    const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
+    const history = [], future = [];
+    // رسائل واتساب
+    const messages = {
+      shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
+      arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
+    };
 
-  const displayMessage = (msg, type = 'info') => {
-    setMessage(msg);
-    setMessageType(type);
-    setShowMessageBox(true);
-  };
-
-  const handleCloseMessageBox = () => {
-    setShowMessageBox(false);
-  };
-
-  const tel = order.phoneNumber?.replace(/\D/g, '');
-
-  const handleStatusChange = (e) => {
-    updateOrderStatus(order.id, e.target.value);
-    displayMessage("تم تحديث حالة الطلب!", "success");
-  };
-
-  const handleManualOrderChange = (e) => {
-    const value = parseInt(e.target.value) || '';
-    setManualOrderValue(value);
-    updateOrderManualNumber(order.id, value === '' ? null : value);
-  };
-
-  const handleDeleteClick = () => {
-    setMessage("هل أنت متأكد أنك تريد حذف هذا الطلب؟");
-    setMessageType("confirm");
-    setShowMessageBox(true);
-  };
-
-  const handleConfirmDelete = () => {
-    deleteOrder(order.id);
-    setShowMessageBox(false);
-    displayMessage("تم حذف الطلب بنجاح!", "success");
-  };
-
-  // Function to truncate address
-  const getTruncatedAddress = (address, maxLength) => {
-    if (address.length > maxLength) {
-      return address.substring(0, maxLength) + '...';
+    // حفظ واستعادة
+    function save() { localStorage.setItem('ordersData', JSON.stringify(orders)); history.push(JSON.stringify(orders)); }
+    function load() {
+      const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }
     }
-    return address;
-  };
 
-  // Conditional rendering based on viewMode
-  if (viewMode === 'list') {
-    return (
-      <div data-id={order.id?.toString()} className={`list-view-item relative bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all duration-200 flex flex-row-reverse items-center justify-between gap-2`}>
-        {/* Checkbox and Order ID */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <input
-            type="checkbox"
-            className="w-5 h-5 rounded-md accent-blue-500 select-label"
-            data-order-id={order.id?.toString()}
-            checked={isSelected}
-            onChange={() => onSelectOrder(order.id?.toString())}
-          />
-          <strong className="text-base text-gray-900 whitespace-nowrap">#{order.orderId?.toString()}</strong>
-        </div>
-
-        {/* Customer Name, Address, Phone - more compact */}
-        <div className="flex-grow text-right pr-2 overflow-hidden">
-          <p className="text-gray-800 font-semibold text-sm truncate">{order.customerName}</p>
-          {/* Apply truncation to address */}
-          <p className="text-gray-600 text-xs whitespace-normal break-words">
-            <i className="bi bi-geo-alt-fill text-blue-500 mr-1"></i> {getTruncatedAddress(order.address, 30)}
-          </p>
-          <p dir="ltr" className="text-gray-600 text-xs whitespace-nowrap">
-            <i className="bi bi-telephone-fill text-green-500 mr-1"></i> {order.phoneNumber}
-          </p>
-        </div>
-
-        {/* Status, Manual Order, Payment Info - compact */}
-        <div className="flex-grow-0 flex-shrink-0 text-center mx-2 flex flex-col items-center gap-1">
-          <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusColor(order.status)}`}>
-            {order.status}
-          </span>
-          {/* Manual order input field */}
-          <input
-            type="number"
-            placeholder="ترتيب"
-            className="p-1 rounded-lg border border-gray-300 text-center w-16 text-gray-700 shadow-sm text-xs"
-            min="1"
-            value={manualOrderValue}
-            onChange={handleManualOrderChange}
-          />
-          {order.paymentMethod === CASH_ON_DELIVERY_METHOD && (
-            <span className="block bg-yellow-100 text-yellow-900 px-2 py-0.5 rounded-full text-xs mt-1 font-bold whitespace-nowrap">
-              {order.totalAmount?.toString()} ر.س
+    function render(){
+      const cont = document.getElementById('ordersContainer');
+      cont.innerHTML = '';
+      let list = orders.slice();
+      if(filterStatus) list = list.filter(o=>o.status===filterStatus);
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      if(q){
+        list = list.filter(o=>
+          (o['رقم الطلب']||'').toString().includes(q) ||
+          (o['اسم العميل']||'').toLowerCase().includes(q)
+        );
+      }
+      // الترتيب حسب manualOrder ثم رقم الطلب
+      list.sort((a,b)=>((a.manualOrder||orders.indexOf(a)+1)-(b.manualOrder||orders.indexOf(b)+1))||((a['رقم الطلب']||'')-(b['رقم الطلب']||'')));
+      if(viewType === 'grid'){
+        cont.className = 'order-grid mb-4';
+        list.forEach((o,i)=>{
+          const num = o.manualOrder||i+1;
+          const tel = (o['رقم الجوال']||'').replace(/\D/g,'');
+          const cod = o['طريقة الدفع']===cashOnDelivery;
+          const card = document.createElement('div');
+          card.className = 'order-card position-relative'+(cod?' cod':'');
+          card.setAttribute('data-id', o['رقم الطلب']);
+          card.innerHTML = `
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <input type="checkbox" class="form-check-input select-label"/>
+    <span class="order-number">
+      <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
+    </span>
+  </div>
+  <div class="mb-1 text-muted fw-bold">#${o['رقم الطلب']||''}</div>
+  <h5 class="mb-2">${o['اسم العميل']||''}</h5>
+            <p class="order-info mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> ${o['عنوان العميل']||''}</p>
+            <div class="d-flex mb-2">
+              <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i> شحن</a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm ms-1"><i class="bi bi-whatsapp"></i> وصول</a>
+              <button class="btn btn-outline-secondary btn-sm ms-2 btn-print-label"><i class="bi bi-printer"></i></button>
+              <button class="btn btn-light btn-sm ms-1 btn-edit-order"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-light btn-sm ms-1 btn-delete-order"><i class="bi bi-trash"></i></button>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <select class="form-select form-select-sm status-select" style="width:auto;">
+                ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </div>`;
+          cont.appendChild(card);
+          card.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
+          card.querySelector('.order-input').addEventListener('change', e=>{
+            o.manualOrder=parseInt(e.target.value)||1; save(); render();
+          });
+          card.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+          card.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
+          card.querySelector('.btn-delete-order').addEventListener('click', ()=>{
+            if(confirm('حذف هذا الطلب؟')){
+              orders=orders.filter(x=>x!==o);
+              save(); render();
+            }
+          });
+        });
+        if(!sortable) initSortable();
+      } else {
+        cont.className = '';
+        list.forEach((o,i)=>{
+          const num = o.manualOrder||i+1;
+          const tel = (o['رقم الجوال']||'').replace(/\D/g,'');
+          const cod = o['طريقة الدفع']===cashOnDelivery;
+          const row = document.createElement('div');
+          row.className = 'order-list-row position-relative'+(cod?' cod':'');
+          row.setAttribute('data-id', o['رقم الطلب']);
+          row.innerHTML = `
+            <input type="checkbox" class="form-check-input select-label"/>
+            <span class="order-number">
+              <input type="number" class="order-input" style="width:50px;display:inline;" min="1" value="${num}">
             </span>
-          )}
-        </div>
-
-        {/* Actions - grouped and smaller icons */}
-        <div className="flex flex-shrink-0 flex-col gap-1 items-end ml-2">
-          <div className="flex gap-1">
-            <a href={`tel:${tel}`} className="bg-blue-500 hover:bg-blue-600 text-white p-1 rounded-md text-sm flex items-center justify-center shadow-sm">
-              <i className="bi bi-telephone-fill"></i>
-            </a>
-            <a href={`https://wa.me/${tel}?text=${encodeURIComponent(WHATSAPP_MESSAGES.shipping)}`} target="_blank" rel="noopener noreferrer" className="bg-green-500 hover:bg-green-600 text-white p-1 rounded-md text-sm flex items-center justify-center shadow-sm">
-              <i className="bi bi-whatsapp"></i>
-            </a>
-            <button onClick={() => generateLabel(order)} className="bg-gray-300 hover:bg-gray-400 text-gray-800 p-1 rounded-md text-sm flex items-center justify-center shadow-sm">
-              <i className="bi bi-printer"></i>
-            </button>
-          </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => onOpenMessageGenerator(order)}
-              className="bg-purple-500 hover:bg-purple-600 text-white p-1 rounded-md text-sm flex items-center justify-center shadow-sm"
-            >
-              <i className="bi bi-chat-text"></i>
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              className="bg-red-500 hover:bg-red-600 text-white p-1 rounded-md text-sm flex items-center justify-center shadow-sm"
-            >
-              <i className="bi bi-trash-fill"></i>
-            </button>
-          </div>
-        </div>
-        {showMessageBox && (
-          <MessageBox
-            message={message}
-            type={messageType}
-            onClose={handleCloseMessageBox}
-            onConfirm={messageType === 'confirm' ? handleConfirmDelete : null}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // Default Grid View
-  return (
-    <div data-id={order.id?.toString()} className={`order-card relative bg-white border border-gray-200 rounded-lg p-6 shadow-md hover:shadow-lg transition-all duration-200 flex flex-col space-y-4 ${order.paymentMethod === CASH_ON_DELIVERY_METHOD ? 'bg-yellow-50 border-yellow-200' : ''}`}>
-      <input
-        type="checkbox"
-        className="absolute top-4 right-4 z-10 w-5 h-5 rounded-md accent-blue-500 select-label"
-        data-order-id={order.id?.toString()}
-        checked={isSelected}
-        onChange={() => onSelectOrder(order.id?.toString())}
-      />
-      <span className="order-number absolute top-4 left-4 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
-        {order.manualOrder !== null ? `ترتيب: ${order.manualOrder?.toString()}` : 'جديد'}
-      </span>
-      <div className={`card-border absolute top-0 right-0 w-1.5 h-full rounded-r-lg ${order.paymentMethod === CASH_ON_DELIVERY_METHOD ? 'bg-yellow-400' : 'bg-blue-600'}`}></div>
-
-      <div className="flex justify-between items-center mb-2 pt-8">
-        <strong className="text-xl text-gray-900">الطلب: #{order.orderId?.toString()}</strong>
-        {order.paymentMethod === CASH_ON_DELIVERY_METHOD && (
-          <span className="bg-yellow-200 text-yellow-900 px-4 py-1.5 rounded-full text-base font-bold">
-            دفع عند الاستلام: {order.totalAmount?.toString()} ر.س
-          </span>
-        )}
-      </div>
-      <h5 className="text-2xl font-bold text-gray-800">{order.customerName}</h5>
-      {/* Apply truncation to address */}
-      <p className="text-gray-700 text-right flex items-center"><i className="bi bi-geo-alt-fill text-blue-500 text-lg ml-2"></i> {getTruncatedAddress(order.address, 30)}</p>
-      <div className="flex items-center text-gray-700 text-right">
-        <i className="bi bi-telephone-fill text-green-500 text-lg ml-2"></i>
-        <span dir="ltr" className="text-lg font-medium">{order.phoneNumber}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mt-auto pt-3 justify-end border-t border-gray-100 pt-4">
-        <a href={`tel:${tel}`} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-md transition-colors text-base flex items-center justify-center shadow-md transform hover:scale-105">
-          <i className="bi bi-telephone-fill mr-1"></i> اتصال
-        </a>
-        <a href={`https://wa.me/${tel}?text=${encodeURIComponent(WHATSAPP_MESSAGES.shipping)}`} target="_blank" rel="noopener noreferrer" className="flex-1 bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition-colors text-base flex items-center justify-center shadow-md transform hover:scale-105">
-          <i className="bi bi-whatsapp mr-1"></i> (وصول)
-        </a>
-        <a href={`https://wa.me/${tel}?text=${encodeURIComponent(WHATSAPP_MESSAGES.arrival)}`} target="_blank" rel="noopener noreferrer" className="flex-1 bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition-colors text-base flex items-center justify-center shadow-md transform hover:scale-105">
-          <i className="bi bi-whatsapp mr-1"></i> (دقيقة)
-        </a>
-        <button onClick={() => generateLabel(order)} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 p-2 rounded-md transition-colors text-base flex items-center justify-center shadow-md transform hover:scale-105">
-          <i className="bi bi-printer mr-1"></i> طباعة
-        </button>
-        <button
-          onClick={() => onOpenMessageGenerator(order)} // New button to open LLM message generator
-          className="flex-1 bg-purple-500 hover:bg-purple-600 text-white p-2 rounded-md transition-colors text-base flex items-center justify-center shadow-md transform hover:scale-105"
-        >
-          <i className="bi bi-chat-text mr-1"></i> ✨ رسالة عميل
-        </button>
-      </div>
-
-      <div className="flex justify-between items-center mt-4 border-t border-gray-100 pt-4">
-        <select
-          value={order.status}
-          onChange={handleStatusChange}
-          className={`p-2 rounded-lg border border-gray-300 text-gray-800 ${getStatusColor(order.status)} transition-colors duration-200 text-right font-semibold shadow-sm`}
-          style={{ width: 'auto', minWidth: '120px' }}
-        >
-          {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <input
-          type="number"
-          placeholder="رقم ترتيب"
-          className="p-2 rounded-lg border border-gray-300 text-center w-24 text-gray-700 shadow-sm"
-          min="1"
-          value={manualOrderValue}
-          onChange={handleManualOrderChange}
-        />
-        <button
-          onClick={handleDeleteClick}
-          className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg transition-colors text-sm shadow-md transform hover:scale-105"
-        >
-          <i className="bi bi-trash-fill"></i>
-        </button>
-      </div>
-      {showMessageBox && (
-        <MessageBox
-          message={message}
-          type={messageType}
-          onClose={handleCloseMessageBox}
-          onConfirm={messageType === 'confirm' ? handleConfirmDelete : null}
-        />
-      )}
-    </div>
-  );
-};
-
-
-// Order Management Controls Component - Updated for mobile layout and Excel readiness
-const OrderManagementControls = ({
-  handleFileUpload,
-  searchQuery,
-  setSearchQuery,
-  isSortableEnabled,
-  setIsSortableEnabled,
-  handleApplyManualNumberSort,
-  handleExportExcel,
-  handleSelectAll,
-  printSelectedLabels,
-  resetOrderToOriginal,
-  handleClearAllData,
-  displayMessage,
-  viewMode,
-  setViewMode,
-  selectedOrderIds,
-  handleBulkStatusUpdate,
-  bulkUpdateStatus,
-  setBulkUpdateStatus,
-  openAddOrderModal,
-  areLibrariesReady // This prop will control button disabled state
-}) => {
-  return (
-    // Changed padding to p-4 for visual consistency and mb-10 to mb-6 for less vertical space
-    <div className="bg-white p-4 rounded-2xl shadow-xl w-full max-w-4xl mb-6 border border-gray-100">
-      <h2 className="text-3xl font-bold mb-4 text-gray-800 text-right">إدارة الطلبات</h2>
-      
-      {/* Row 1: Add Order, File Upload, Search */}
-      {/* Reduced gap to gap-2, and mb-6 to mb-3 */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2 mb-3">
-        <button
-          onClick={openAddOrderModal}
-          className="w-full sm:w-auto flex-1 min-w-[180px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center"
-        >
-          <i className="bi bi-plus-circle-fill ml-2"></i> إضافة طلب جديد
-        </button>
-        <input
-          type="file"
-          className="w-full sm:w-auto flex-1 min-w-[200px] p-3 border border-gray-300 rounded-lg text-gray-700 shadow-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          accept=".xlsx,.xls"
-          onChange={handleFileUpload}
-          disabled={!areLibrariesReady}
-        />
-        <input
-          type="text"
-          placeholder="ابحث برقم الطلب أو اسم العميل"
-          className="w-full sm:w-auto flex-1 min-w-[200px] p-3 border border-gray-300 rounded-lg text-right text-gray-700 placeholder-gray-400 shadow-sm"
-          dir="rtl"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-
-      {/* Row 2: Sorting, Export, View Toggles - Consolidated and more compact */}
-      {/* Changed flex-wrap behavior to ensure more consistent row layout */}
-      <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
-        <button
-          onClick={() => setIsSortableEnabled(!isSortableEnabled)}
-          className={`w-full sm:w-auto flex-1 min-w-[150px] font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md ${isSortableEnabled ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}
-          disabled={!areLibrariesReady}
-        >
-          <i className={`bi ${isSortableEnabled ? 'bi-lock-fill' : 'bi-unlock-fill'} ml-2`}></i>
-          {isSortableEnabled ? 'تعطيل الترتيب اليدوي' : 'تمكين الترتيب اليدوي'}
-        </button>
-        <button
-          onClick={handleApplyManualNumberSort}
-          className="w-full sm:w-auto flex-1 min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md"
-          disabled={!areLibrariesReady}
-        >
-          <i className="bi bi-sort-numeric-down ml-2"></i> تطبيق الترقيم اليدوي
-        </button>
-        <button
-          onClick={handleExportExcel}
-          className="w-full sm:w-auto flex-1 min-w-[150px] bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!areLibrariesReady}
-        >
-          <i className="bi bi-file-earmark-excel-fill ml-2"></i> تصدير Excel
-        </button>
-        {/* View Toggle Buttons - More compact (py-2 px-3), icon-only on very small screens */}
-        <div className="flex justify-center gap-2 p-2 bg-gray-50 rounded-lg shadow-inner flex-shrink-0">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`py-2 px-3 rounded-lg transition-colors duration-200 shadow-sm font-semibold text-sm transform hover:scale-105 ${viewMode === 'grid' ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-            >
-              <i className="bi bi-grid-3x3-gap-fill"></i> <span className="hidden sm:inline">شبكي</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`py-2 px-3 rounded-lg transition-colors duration-200 shadow-sm font-semibold text-sm transform hover:scale-105 ${viewMode === 'list' ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-            >
-              <i className="bi bi-list-ul"></i> <span className="hidden sm:inline">قائمة</span>
-            </button>
-        </div>
-      </div>
-
-      {/* Row 3: Bulk Actions (Select All, Bulk Status Update, Print Selected) & Maintenance (Reset, Clear) - Highly Consolidated */}
-      {/* Using grid layout for better distribution on larger screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 p-3 bg-gray-50 rounded-lg shadow-inner">
-        {/* Select All */}
-        <button
-          onClick={handleSelectAll}
-          className="col-span-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-3 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md text-sm"
-        >
-          <i className="bi bi-check-square-fill ml-1"></i> تحديد/إلغاء الكل
-        </button>
-        
-        {/* Bulk Status Update */}
-        <div className="col-span-1 sm:col-span-2 flex items-center gap-1">
-          <select
-            value={bulkUpdateStatus}
-            onChange={(e) => setBulkUpdateStatus(e.target.value)}
-            className="flex-1 p-2 border border-gray-300 rounded-lg text-gray-800 shadow-sm transition-all duration-200 text-right font-semibold text-sm"
-            dir="rtl"
-          >
-            <option value="">تغيير حالة المحدد إلى...</option>
-            {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button
-            onClick={handleBulkStatusUpdate}
-            disabled={selectedOrderIds.length === 0 || !bulkUpdateStatus}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm flex-shrink-0"
-          >
-            <i className="bi bi-arrow-repeat ml-1"></i> تطبيق
-          </button>
-        </div>
-
-        {/* Print Selected Labels */}
-        <button
-          onClick={printSelectedLabels}
-          disabled={selectedOrderIds.length === 0 || !areLibrariesReady}
-          className="col-span-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-        >
-          <i className="bi bi-printer-fill ml-1"></i> طباعة بوليصات مختارة
-        </button>
-
-        {/* Reset Order and Clear All Data - Now part of the grid, smaller text/icon focus */}
-        <button
-            onClick={resetOrderToOriginal}
-            className="col-span-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md text-sm flex items-center justify-center"
-        >
-            <i className="bi bi-arrow-counterclockwise sm:mr-1"></i> <span className="hidden sm:inline">إعادة الترتيب</span>
-        </button>
-        <button
-          onClick={() => displayMessage("هل أنت متأكد أنك تريد مسح جميع بيانات الطلبات؟ لا يمكن التراجع عن هذا الإجراء.", "confirm", handleClearAllData)}
-          className="col-span-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md text-sm flex items-center justify-center"
-        >
-          <i className="bi bi-trash-fill sm:ml-1"></i> <span className="hidden sm:inline">مسح البيانات</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
-// Order Grid/List Display Component - now accepts viewMode and passes selection props
-const OrderGridDisplay = ({ orders, updateOrderStatus, deleteOrder, generateLabel, updateOrderManualNumber, ordersContainerRef, viewMode, onOpenMessageGenerator, onSelectOrder, selectedOrderIds }) => {
-  const containerClasses = viewMode === 'grid'
-    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
-    : "flex flex-col gap-4"; // Use flex-col for list view
-
-  return (
-    <div id="ordersContainer" ref={ordersContainerRef} className={containerClasses}>
-      {orders.length === 0 ? (
-        <p className="col-span-full text-center text-gray-600 py-10 text-xl">لا توجد طلبات لعرضها حالياً.</p>
-      ) : (
-        orders.map(order => (
-          <OrderCard
-            key={order.id?.toString()}
-            order={order}
-            updateOrderStatus={updateOrderStatus}
-            deleteOrder={deleteOrder}
-            generateLabel={generateLabel}
-            updateOrderManualNumber={updateOrderManualNumber}
-            onOpenMessageGenerator={onOpenMessageGenerator} // Pass LLM message generator handler
-            onSelectOrder={onSelectOrder}
-            isSelected={selectedOrderIds.includes(order.id?.toString())}
-            viewMode={viewMode} // Pass viewMode to OrderCard
-          />
-        ))
-      )}
-    </div>
-  );
-};
-
-// Modal for Add Order Form
-const AddOrderModal = ({ addOrder, onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-4xl w-full mx-auto animate-fade-in-up relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 text-gray-600 hover:text-gray-900 text-3xl font-bold"
-        >
-          &times;
-        </button>
-        <OrderForm addOrder={addOrder} onClose={onClose} />
-      </div>
-    </div>
-  );
-};
-
-
-// Main App Content Component (orchestrates everything)
-const MainAppContent = () => {
-  const { db, userId, isAuthReady } = useFirebase();
-  const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSortableEnabled, setIsSortableEnabled] = useState(false);
-  const ordersContainerRef = useRef(null);
-  const sortableInstance = useRef(null);
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-  const [showMessageBox, setShowMessageBox] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('info');
-  const [confirmCallback, setConfirmCallback] = useState(null); // To store callback for confirmation
-
-  // Define displayMessage using useCallback FIRST
-  const displayMessage = useCallback((msg, type = 'info', callback = null) => {
-    setMessage(msg);
-    setMessageType(type);
-    setShowMessageBox(true);
-    setConfirmCallback(() => callback);
-  }, []);
-
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  const [showAddOrderModal, setShowAddOrderModal] = useState(false);
-  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
-  const [bulkUpdateStatus, setBulkUpdateStatus] = useState('');
-
-  // State for LLM message generator modal
-  const [showLLMMessageModal, setShowLLMMessageModal] = useState(false);
-  const [selectedOrderForLLM, setSelectedOrderForLLM] = useState(null);
-
-  // State to control visibility of OrderManagementControls
-  const [showControls, setShowControls] = useState(true);
-
-  // Tone.js Synths for sound effects
-  const successSynth = useRef(null);
-  const failSynth = useRef(null);
-
-  useEffect(() => {
-    // Dynamically load Tone.js script
-    const loadToneJs = (src, id) => {
-      return new Promise((resolve, reject) => {
-        if (document.getElementById(id)) {
-          console.log(`${id} already present.`);
-          resolve();
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = src;
-        script.id = id;
-        script.async = true;
-        script.onload = () => {
-          console.log(`${id} loaded successfully.`);
-          // Check if Tone is defined
-          if (typeof window.Tone !== 'undefined') {
-            resolve();
-          } else {
-            // Poll for Tone.js readiness
-            const checkToneReady = () => {
-              if (typeof window.Tone !== 'undefined') {
-                resolve();
-              } else {
-                setTimeout(checkToneReady, 50);
-              }
-            };
-            checkToneReady();
-          }
-        };
-        script.onerror = (e) => {
-          console.error(`Error loading ${id}:`, e);
-          reject(new Error(`Failed to load ${id}`));
-        };
-        document.head.appendChild(script);
-      });
-    };
-
-    loadToneJs("https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js", "tonejsScript")
-      .then(() => {
-        // Initialize Tone.js synths only after the script is loaded
-        // Ensure Tone.context is started on first user interaction for audio to work.
-        // For simplicity here, we'll initialize them, but a more robust app would start Tone.context
-        // on a button click or touch event.
-        if (typeof window.Tone !== 'undefined') {
-          successSynth.current = new window.Tone.Synth().toDestination();
-          failSynth.current = new window.Tone.NoiseSynth().toDestination();
-        }
-      })
-      .catch(error => console.error("Error loading Tone.js:", error));
-
-    return () => {
-      // Clean up Tone.js synths on unmount
-      if (successSynth.current) {
-        successSynth.current.dispose();
-      }
-      if (failSynth.current) {
-        failSynth.current.dispose();
-      }
-    };
-  }, []);
-
-  // Function to play sound
-  const playSound = useCallback((type) => {
-    if (typeof window.Tone === 'undefined') {
-      console.warn("Tone.js is not loaded. Cannot play sound.");
-      return;
-    }
-    // Ensure the audio context is active
-    if (window.Tone.context.state !== 'running') {
-      window.Tone.start();
-    }
-
-    if (type === 'success' && successSynth.current) {
-      successSynth.current.triggerAttackRelease('C5', '8n'); // A clear, higher tone
-    } else if (type === 'fail' && failSynth.current) {
-      failSynth.current.triggerAttackRelease('16n'); // A short, noisy sound
-    }
-  }, []);
-
-
-  const handleOpenMessageGenerator = (order) => {
-    setSelectedOrderForLLM(order);
-    setShowLLMMessageModal(true);
-  };
-
-  const handleCloseLLMMessageModal = () => {
-    setShowLLMMessageModal(false);
-    setSelectedOrderForLLM(null);
-  };
-
-  // Function to toggle controls visibility
-  const toggleControlsVisibility = useCallback(() => {
-    setShowControls(prev => !prev);
-  }, []);
-
-
-  // State to track if ALL required external libraries are ready
-  const [areLibrariesReady, setAreLibrariesReady] = useState(false);
-
-  // Check for ALL libraries readiness on component mount
-  useEffect(() => {
-    let scriptLoadPromises = [];
-
-    const loadScript = (src, id) => {
-      return new Promise((resolve, reject) => {
-        // Prevent re-adding scripts if they already exist
-        if (document.getElementById(id)) {
-          console.log(`${id} already present.`);
-          resolve();
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = src;
-        script.id = id;
-        script.async = true; // Load asynchronously
-        script.onload = () => {
-          console.log(`${id} loaded successfully.`);
-          // For XLSX, specifically check for its core functionality after script load
-          if (id === 'xlsxScript') {
-            const checkXLSXReady = () => {
-              if (typeof window.XLSX !== 'undefined' && typeof window.XLSX.utils !== 'undefined' && typeof window.XLSX.read === 'function') {
-                console.log('XLSX.utils and XLSX.read are ready.');
-                resolve();
-              } else {
-                console.log('XLSX components not yet ready, retrying...');
-                setTimeout(checkXLSXReady, 50); // Poll every 50ms
-              }
-            };
-            checkXLSXReady();
-          } else {
-            resolve(); // For other scripts, onload is sufficient
-          }
-        };
-        script.onerror = (e) => {
-          console.error(`Error loading ${id}:`, e);
-          reject(new Error(`Failed to load ${id}`));
-        };
-        document.head.appendChild(script);
-      });
-    };
-
-    // Define scripts to load dynamically
-    const scriptsToLoad = [
-      { src: "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js", id: "xlsxScript" },
-      { src: "https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js", id: "sortableScript" },
-      { src: "https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js", id: "jsbarcodeScript" },
-      { src: "https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js", id: "qrcodeScript" }
-    ];
-
-    Promise.all(scriptsToLoad.map(s => loadScript(s.src, s.id)))
-      .then(() => {
-        console.log("All external libraries reported ready.");
-        setAreLibrariesReady(true);
-      })
-      .catch((error) => {
-        console.error("One or more libraries failed to load:", error);
-        displayMessage("لم يتم تحميل بعض المكتبات الأساسية. قد لا تعمل بعض الميزات (مثل Excel أو الطباعة) بشكل صحيح.", "error");
-        setAreLibrariesReady(false);
-      });
-
-    // Cleanup function: remove dynamically added scripts if component unmounts
-    return () => {
-      scriptsToLoad.forEach(s => {
-        const scriptElement = document.getElementById(s.id);
-        if (scriptElement) {
-          scriptElement.remove();
-        }
-      });
-    };
-  }, [displayMessage]);
-
-
-  const handleCloseMessageBox = useCallback(() => {
-    setShowMessageBox(false);
-    setConfirmCallback(null);
-  }, []);
-
-  const handleConfirmAction = useCallback(() => {
-    if (confirmCallback) {
-      confirmCallback();
-    }
-    handleCloseMessageBox();
-  }, [confirmCallback, handleCloseMessageBox]);
-
-  // Functions to interact with Firestore
-  const addOrder = useCallback(async (orderData) => {
-    if (!db || !userId) {
-      displayMessage("الخدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-      return false; // Indicate failure
-    }
-    try {
-      const ordersColRef = collection(db, `artifacts/${appId}/users/${userId}/delivery_orders`);
-      
-      // Check for duplicate orderId
-      const q = query(ordersColRef, where("orderId", "==", orderData.orderId));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        displayMessage(`رقم الطلب "${orderData.orderId}" موجود بالفعل. الرجاء استخدام رقم طلب فريد.`, "error");
-        return false; // Indicate failure
-      }
-
-      await addDoc(ordersColRef, {
-        ...orderData,
-        createdAt: serverTimestamp()
-      });
-      return true; // Indicate success
-    } catch (e) {
-      console.error("Error adding document: ", e);
-      displayMessage("حدث خطأ أثناء إضافة الطلب.", "error");
-      return false; // Indicate failure
-    }
-  }, [db, userId, appId, displayMessage]);
-
-  const updateOrderStatus = useCallback(async (id, newStatus) => {
-    if (!db || !userId) {
-      displayMessage("الخدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-      return;
-    }
-    try {
-      const orderDocRef = doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, id);
-      await updateDoc(orderDocRef, { status: newStatus });
-    } catch (e) {
-      console.error("Error updating document: ", e);
-      displayMessage("حدث خطأ أثناء تحديث حالة الطلب.", "error");
-    }
-  }, [db, userId, appId, displayMessage]);
-
-  const updateOrderManualNumber = useCallback(async (id, newNumber) => {
-    if (!db || !userId) {
-      console.error("Firestore DB or UserID not available. Cannot update order manual number.");
-      return;
-    }
-    try {
-      const orderDocRef = doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, id);
-      await updateDoc(docRef, { manualOrder: newNumber });
-    } catch (e) {
-      console.error("Error updating manual order number:", e);
-      displayMessage("حدث خطأ أثناء تحديث الرقم اليدوي.", "error");
-    }
-  }, [db, userId, appId, displayMessage]);
-
-  const deleteOrder = useCallback(async (id) => {
-    if (!db || !userId) {
-      displayMessage("الخدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-      return;
-    }
-    try {
-      const orderDocRef = doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, id);
-      await deleteDoc(orderDocRef);
-    } catch (e) {
-      console.error("Error deleting document: ", e);
-      displayMessage("حدث خطأ أثناء حذف الطلب.", "error");
-    }
-  }, [db, userId, appId, displayMessage]);
-
-  // Excel Import/Export
-  const handleFileUpload = useCallback((e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      displayMessage("الرجاء اختيار ملف.", "error");
-      return;
-    }
-    // Simply rely on areLibrariesReady, as the useEffect now ensures deep readiness
-    if (!areLibrariesReady) {
-      displayMessage("مكتبات Excel غير جاهزة بعد. الرجاء الانتظار قليلاً.", "error");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const binaryString = evt.target.result;
-        const workbook = window.XLSX.read(binaryString, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonOrders = window.XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-        const newOrdersPromises = jsonOrders.map(async (row) => {
-          const orderData = {
-            customerName: row['اسم العميل'] || '',
-            address: row['عنوان العميل'] || '',
-            phoneNumber: row['رقم الجوال']?.toString() || '',
-            orderId: row['رقم الطلب']?.toString() || '',
-            paymentMethod: row['طريقة الدفع'] || 'مدفوع مسبقا',
-            totalAmount: parseFloat(row['إجمالي الطلب']) || 0,
-            status: row['الحالة'] || 'قيد الانتظار',
-            manualOrder: row['الترتيب اليدوي'] ? parseInt(row['الترتيب اليدوي']) : null,
-            createdAt: serverTimestamp()
-          };
-          
-          // Check for duplicate orderId before adding from Excel
-          const ordersColRef = collection(db, `artifacts/${appId}/users/${userId}/delivery_orders`);
-          const q = query(ordersColRef, where("orderId", "==", orderData.orderId));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            console.warn(`Skipping duplicate order ID from Excel: ${orderData.orderId}`);
-            displayMessage(`تجاهل طلب مكرر من Excel: رقم الطلب "${orderData.orderId}" موجود بالفعل.`, "info");
-            return null; // Skip adding this duplicate
-          } else {
-            if (db && userId) {
-              await addDoc(ordersColRef, orderData);
+            <div class="order-info-list">
+              <strong>#${o['رقم الطلب']||''}</strong>
+              <span>${o['اسم العميل']||''}</span>
+              <span>${o['عنوان العميل']||''}</span>
+              <span>${o['رقم الجوال']||''}</span>
+            </div>
+            <div>
+              <a href="tel:${tel}" class="btn btn-outline-primary btn-sm"><i class="bi bi-telephone-fill"></i></a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.shipping)}" target="_blank" class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i> شحن</a>
+              <a href="https://wa.me/${tel}?text=${encodeURIComponent(messages.arrival)}" target="_blank" class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i> وصول</a>
+              <button class="btn btn-outline-secondary btn-sm btn-print-label"><i class="bi bi-printer"></i></button>
+              <button class="btn btn-light btn-sm btn-edit-order"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-light btn-sm btn-delete-order"><i class="bi bi-trash"></i></button>
+            </div>
+            <select class="form-select form-select-sm status-select" style="width:auto;min-width:110px;display:inline-block;">
+              ${statuses.map(s=>`<option value="${s}"${s===o.status?' selected':''}>${s}</option>`).join('')}
+            </select>`;
+          cont.appendChild(row);
+          row.querySelector('.status-select').addEventListener('change', e=>{ o.status=e.target.value; save(); render(); });
+          row.querySelector('.order-input').addEventListener('change', e=>{
+            o.manualOrder=parseInt(e.target.value)||1; save(); render();
+          });
+          row.querySelector('.btn-print-label').addEventListener('click', ()=> generateLabel(o));
+          row.querySelector('.btn-edit-order').addEventListener('click', ()=> editOrder(o));
+          row.querySelector('.btn-delete-order').addEventListener('click', ()=>{
+            if(confirm('حذف هذا الطلب؟')){
+              orders=orders.filter(x=>x!==o);
+              save(); render();
             }
-            return orderData; // Return added order data
-          }
-        }).filter(Boolean); // Filter out nulls (skipped duplicates)
-        
-        await Promise.all(newOrdersPromises);
-        displayMessage("تم استيراد الطلبات بنجاح من ملف Excel (تم تجاهل الطلبات المكررة).", "success");
-      } catch (error) {
-        console.error("Error processing Excel file:", error);
-        displayMessage("حدث خطأ أثناء معالجة ملف Excel. تأكد من أن الملف بصيغة صحيحة.", "error");
-      }
-    };
-    reader.readAsBinaryString(file);
-  }, [db, userId, appId, displayMessage, areLibrariesReady]);
-
-  const handleExportExcel = useCallback(() => {
-    if (orders.length === 0) {
-      displayMessage("لا توجد بيانات للتصدير.", "info");
-      return;
-    }
-    // Simply rely on areLibrariesReady, as the useEffect now ensures deep readiness
-    if (!areLibrariesReady) {
-      displayMessage("مكتبات Excel غير جاهزة بعد. الرجاء الانتظار قليلاً.", "error");
-      return;
-    }
-    const data = orders.map(o => ({
-      'رقم الطلب': o.orderId,
-      'اسم العميل': o.customerName,
-      'رقم الجوال': o.phoneNumber,
-      'عنوان العميل': o.address,
-      'طريقة الدفع': o.paymentMethod,
-      'إجمالي الطلب': o.totalAmount,
-      'الحالة': o.status,
-      'الترتيب اليدوي': o.manualOrder || ''
-    }));
-    const ws = window.XLSX.utils.json_to_sheet(data);
-    const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-    window.XLSX.writeFile(wb, 'Orders_export.xlsx');
-    displayMessage("تم تصدير الطلبات إلى ملف Excel.", "success");
-  }, [orders, displayMessage, areLibrariesReady]);
-
-  // Label Generation and Printing
-  const generateLabel = useCallback((order) => {
-    // Check if JsBarcode and QRCode are available globally before proceeding
-    if (!areLibrariesReady) {
-      displayMessage("مكتبات الباركود/QR Code غير جاهزة بعد. الرجاء الانتظار قليلاً.", "error");
-      return;
-    }
-
-    const tpl = document.createElement('div');
-    tpl.innerHTML = `
-      <div class="label" style="width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; font-family: 'Inter', sans-serif;">
-        <img class="label-logo" src="${COMPANY_INFO.logo}" alt="شعار ${COMPANY_INFO.name}" style="display:block; max-width:40mm; margin:0 auto 2mm; height:auto;">
-        <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="cod-box" style="display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000;">
-            <div class="title" style="flex:1; line-height:10mm; font-weight:600;">الدفع عند الاستلام</div>
-            <div class="amount" style="flex:1; line-height:10mm; font-weight:bold; background:#000; color:#fff;">${order.paymentMethod === CASH_ON_DELIVERY_METHOD ? order.totalAmount?.toString() : '0'}</div>
-          </div>
-          <div class="company-info" style="border:1px solid #000; padding:2mm; text-align:right;">
-            <div class="name">${COMPANY_INFO.name}</div>
-            <div>${COMPANY_INFO.location}</div>
-            <div>جوال: ${COMPANY_INFO.phone}</div>
-          </div>
-        </div>
-        <div class="info-box" style="border:1px solid #000; padding:2mm; margin:2mm 0; font-weight:500; text-align:right;">
-          <div class="line" style="margin-bottom:1mm;"><strong>العميل:</strong> ${order.customerName}</div>
-          <div class="line" style="margin-bottom:1mm;"><strong>رقم الطلب:</strong> ${order.orderId?.toString()}</div>
-          <div class="line" style="margin-bottom:1mm;"><strong>جوال:</strong> ${order.phoneNumber}</div>
-          <div class="line" style="margin-bottom:1mm;"><strong>العنوان:</strong> ${order.address}</div>
-        </div>
-        <div class="codes" style="display:flex; justify-content:space-between; align-items:center; margin-top:4mm; gap:3mm;">
-          <div class="qrcode-area" style="width:28mm; height:28mm;"></div>
-          <div class="barcode-wrapper" style="text-align:center;">
-            <svg class="jsbarcode" style="width:60mm; height:auto;"></svg>
-            <div class="barcode-text" style="margin-top:1mm; font-size:12pt; font-weight:bold;">${order.orderId?.toString()}</div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const win = window.open('', '_blank');
-    win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
-    const styleContent = document.querySelector('style').innerHTML;
-    win.document.write(`<style>${styleContent}</style></head><body>`);
-    win.document.body.appendChild(tpl);
-
-    const svgElement = win.document.querySelector('.jsbarcode');
-    if (svgElement) {
-        window.JsBarcode(svgElement, order.orderId?.toString(), { format: "CODE128", height: 50, width: 2, displayValue: false, margin: 0 });
-    } else {
-        console.error("SVG element for barcode not found in new window.");
-    }
-
-    const qrCodeArea = win.document.querySelector('.qrcode-area');
-    if (qrCodeArea) {
-        new window.QRCode(qrCodeArea, {
-            text: order.orderId?.toString(),
-            width: 100,
-            height: 100,
-            correctLevel: window.QRCode.CorrectLevel.H
+          });
         });
-    } else {
-        console.error("QR Code area not found in new window.");
-    }
-    
-    win.document.close();
-    setTimeout(() => win.print(), 300);
-  }, [displayMessage, areLibrariesReady]);
-
-  const printSelectedLabels = useCallback(() => {
-    // Check if JsBarcode and QRCode are available globally before proceeding
-    if (!areLibrariesReady) {
-      displayMessage("مكتبات الباركود/QR Code غير جاهزة بعد. الرجاء الانتظار قليلاً.", "error");
-      return;
+      }
     }
 
-    const idsToPrint = selectedOrderIds; // Use the state for selected IDs
-    if (idsToPrint.length === 0) {
-      displayMessage("لم تختَر أي طلبات للطباعة.", "info");
-      return;
+    function initSortable(){
+      if(sortable) sortable.destroy();
+      sortable = Sortable.create(document.getElementById('ordersContainer'), {
+        animation:150, disabled:viewType!=='grid',
+        onEnd: ()=>{
+          const ids = Array.from(document.querySelectorAll('.order-card,.order-list-row'))
+            .map(c=>c.getAttribute('data-id'));
+          orders = ids.map(id=>orders.find(o=>o['رقم الطلب'].toString()===id));
+          save(); render();
+        }
+      });
     }
 
-    const ordersToPrint = orders.filter(o => idsToPrint.includes(o.id));
-
-    const win = window.open('', '_blank');
-    win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
-    const styleContent = document.querySelector('style').innerHTML;
-    win.document.write(`<style>${styleContent}</style></head><body>`);
-    
-    ordersToPrint.forEach(o => {
-      const tpl = document.createElement('div');
-      tpl.innerHTML = `
-        <div class="label" style="width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; font-family: 'Inter', sans-serif;">
-          <img class="label-logo" src="${COMPANY_INFO.logo}" alt="شعار ${COMPANY_INFO.name}" style="display:block; max-width:40mm; margin:0 auto 2mm; height:auto;">
-          <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="cod-box" style="display:flex; flex-direction:column; width:30mm; height:20mm; text-align:center; border:1px solid #000;">
-              <div class="title" style="flex:1; line-height:10mm; font-weight:600;">الدفع عند الاستلام</div>
-              <div class="amount" style="flex:1; line-height:10mm; font-weight:bold; background:#000; color:#fff;">${o.paymentMethod === CASH_ON_DELIVERY_METHOD ? o.totalAmount?.toString() : '0'}</div>
-            </div>
-            <div class="company-info" style="border:1px solid #000; padding:2mm; text-align:right;">
-              <div class="name">${COMPANY_INFO.name}</div>
-              <div>${COMPANY_INFO.location}</div>
-              <div>جوال: ${COMPANY_INFO.phone}</div>
-            </div>
-          </div>
-          <div class="info-box" style="border:1px solid #000; padding:2mm; margin:2mm 0; font-weight:500; text-align:right;">
-            <div class="line" style="margin-bottom:1mm;"><strong>العميل:</strong> ${o.customerName}</div>
-            <div class="line" style="margin-bottom:1mm;"><strong>رقم الطلب:</strong> ${o.orderId?.toString()}</div>
-            <div class="line" style="margin-bottom:1mm;"><strong>جوال:</strong> ${o.phoneNumber}</div>
-            <div class="line" style="margin-bottom:1mm;"><strong>العنوان:</strong> ${o.address}</div>
-          </div>
-          <div class="codes" style="display:flex; justify-content:space-between; align-items:center; margin-top:4mm; gap:3mm;">
-            <div class="qrcode-area" style="width:28mm; height:28mm;"></div>
-            <div class="barcode-wrapper" style="text-align:center;">
-              <svg class="jsbarcode" style="width:60mm; height:auto;"></svg>
-              <div class="barcode-text" style="margin-top:1mm; font-size:12pt; font-weight:bold;">${o.orderId?.toString()}</div>
-            </div>
-          </div>
-        </div>
-      `;
+    // طباعة بوليصة واحدة
+    function generateLabel(o){
+      const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
+      tpl.querySelector('[data-name]').textContent    = o['اسم العميل']||'';
+      tpl.querySelector('[data-id]').textContent      = o['رقم الطلب']||'';
+      tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال']||'';
+      tpl.querySelector('[data-address]').textContent = o['عنوان العميل']||'';
+      tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']||'0':'0';
+      if(o['ملاحظة']) {
+        tpl.querySelector('[data-note]').textContent = o['ملاحظة'];
+        tpl.querySelector('[data-note-line]').style.display='';
+      }
+      // باركود
+      const svg = tpl.querySelector('.jsbarcode');
+      JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+      tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
+      // QR
+      new QRCode(tpl.querySelector('[data-qr]'), {
+        text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
+      });
+      const win = window.open('','_blank');
+      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
       win.document.body.appendChild(tpl);
-
-      const currentLabelDiv = win.document.body.lastChild;
-      const svgElement = currentLabelDiv.querySelector('.jsbarcode');
-      if (svgElement) {
-          window.JsBarcode(svgElement, o.orderId?.toString(), { format: "CODE128", height: 50, width: 2, displayValue: false, margin: 0 });
-      } else {
-          console.error("SVG element for barcode not found in new window for order:", o.orderId);
-      }
-
-      const qrCodeArea = currentLabelDiv.querySelector('.qrcode-area');
-      if (qrCodeArea) {
-          new window.QRCode(qrCodeArea, {
-              text: o.orderId?.toString(),
-              width: 100,
-              height: 100,
-              correctLevel: window.QRCode.CorrectLevel.H
-          });
-      } else {
-          console.error("QR Code area not found in new window.");
-      }
-    });
-
-    win.document.close();
-    setTimeout(() => win.print(), 300);
-  }, [selectedOrderIds, orders, displayMessage, areLibrariesReady]);
-
-  // Toggle single order selection
-  const handleSelectOrder = useCallback((orderId) => {
-    setSelectedOrderIds(prevSelected =>
-      prevSelected.includes(orderId)
-        ? prevSelected.filter(id => id !== orderId)
-        : [...prevSelected, orderId]
-    );
-  }, []);
-
-  // Toggle all order selections
-  const handleSelectAll = useCallback(() => {
-    if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
-      setSelectedOrderIds([]); // Deselect all
-    } else {
-      setSelectedOrderIds(filteredOrders.map(order => order.id?.toString())); // Select all filtered orders
-    }
-  }, [selectedOrderIds, filteredOrders]);
-
-  // Bulk status update
-  const handleBulkStatusUpdate = useCallback(async () => {
-    if (!bulkUpdateStatus || selectedOrderIds.length === 0) {
-      displayMessage("الرجاء اختيار حالة وتحديد طلبات لتحديثها.", "info");
-      return;
+      win.document.close();
+      setTimeout(()=>win.print(),300);
     }
 
-    displayMessage(
-      `هل أنت متأكد أنك تريد تغيير حالة ${selectedOrderIds.length} طلبات إلى "${bulkUpdateStatus}"؟`,
-      "confirm",
-      async () => {
-        if (!db || !userId) {
-          displayMessage("الخدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-          return;
+    // طباعة بوليصات مختارة
+    function printSelectedLabels(){
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card,.order-list-row').getAttribute('data-id'));
+      if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
+      const win = window.open('','_blank');
+      win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
+      ids.forEach(id=>{
+        const o = orders.find(x=>x['رقم الطلب'].toString()===id);
+        const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
+        tpl.querySelector('[data-name]').textContent    = o['اسم العميل']||'';
+        tpl.querySelector('[data-id]').textContent      = o['رقم الطلب']||'';
+        tpl.querySelector('[data-phone]').textContent   = o['رقم الجوال']||'';
+        tpl.querySelector('[data-address]').textContent = o['عنوان العميل']||'';
+        tpl.querySelector('[data-cod]').textContent     = o['طريقة الدفع']===cashOnDelivery?o['إجمالي الطلب']||'0':'0';
+        if(o['ملاحظة']) {
+          tpl.querySelector('[data-note]').textContent = o['ملاحظة'];
+          tpl.querySelector('[data-note-line]').style.display='';
         }
-        try {
-          const batch = getFirestore().batch();
-          selectedOrderIds.forEach(id => {
-            const docRef = doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, id);
-            batch.update(docRef, { status: bulkUpdateStatus });
-          });
-          await batch.commit();
-          displayMessage(`تم تحديث حالة ${selectedOrderIds.length} طلبات بنجاح إلى "${bulkUpdateStatus}".`, "success");
-          setSelectedOrderIds([]); // Clear selection after update
-          setBulkUpdateStatus(''); // Reset status dropdown
-        } catch (error) {
-          console.error("Error bulk updating order statuses:", error);
-          displayMessage("حدث خطأ أثناء تحديث الحالات بشكل جماعي.", "error");
-        }
-      }
-    );
-  }, [bulkUpdateStatus, selectedOrderIds, db, userId, appId, displayMessage]);
-
-
-  const handleClearAllData = useCallback(async () => {
-    if (!db || !userId) {
-      displayMessage("ال خدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-      return;
-    }
-    displayMessage("هل أنت متأكد أنك تريد مسح جميع بيانات الطلبات؟ لا يمكن التراجع عن هذا الإجراء.", "confirm", async () => {
-        try {
-            const ordersColRef = collection(db, `artifacts/${appId}/users/${userId}/delivery_orders`);
-            const snapshot = await getDocs(query(ordersColRef));
-            const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, d.id)));
-            await Promise.all(deletePromises);
-            setOrders([]);
-            displayMessage("تم مسح جميع البيانات بنجاح.", "success");
-        } catch (error) {
-            console.error("Error clearing all data:", error);
-            displayMessage("حدث خطأ أثناء مسح البيانات.", "error");
-        }
-    });
-  }, [db, userId, appId, displayMessage]);
-
-  const resetOrderToOriginal = useCallback(async () => {
-    if (!db || !userId) {
-      displayMessage("الخدمة غير متاحة. الرجاء المحاولة لاحقاً.", "error");
-      return;
-    }
-    displayMessage("سيتم إعادة تعيين جميع الطلبات إلى حالتها الأصلية (مسح الترتيب اليدوي).", "confirm", async () => {
-        try {
-            const ordersColRef = collection(db, `artifacts/${appId}/users/${userId}/delivery_orders`);
-            const snapshot = await getDocs(query(ordersColRef));
-            const updatePromises = snapshot.docs.map(d => updateDoc(doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, d.id), { manualOrder: null }));
-            await Promise.all(updatePromises);
-            displayMessage("تم إعادة تعيين ترتيب الطلبات بنجاح.", "success");
-        } catch (error) {
-            console.error("Error resetting order to original:", error);
-            displayMessage("حدث خطأ أثناء إعادة تعيين الطلبات.", "error");
-        }
-    });
-  }, [db, userId, appId, displayMessage]);
-
-  const handleApplyManualNumberSort = useCallback(() => {
-    const sortedByManualOrder = [...orders].sort((a, b) => {
-        const manualA = a.manualOrder !== null ? a.manualOrder : Infinity;
-        const manualB = b.manualOrder !== null ? b.manualOrder : Infinity;
-        return manualA - manualB;
-    });
-    setOrders(sortedByManualOrder);
-    displayMessage("تم تطبيق الترتيب اليدوي.", "success");
-  }, [orders, displayMessage]);
-
-  // Firestore Data Listener
-  useEffect(() => {
-    if (db && userId && isAuthReady) {
-      setLoading(true);
-      const ordersColRef = collection(db, `artifacts/${appId}/users/${userId}/delivery_orders`);
-      const q = query(ordersColRef);
-
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedOrders = snapshot.docs.map(doc => ({
-          id: doc.id?.toString(), // Ensure ID is a string
-          ...doc.data(),
-          totalAmount: parseFloat(doc.data().totalAmount || 0)
-        }));
-        fetchedOrders.sort((a, b) => {
-          if (a.manualOrder !== null && b.manualOrder !== null) {
-            return a.manualOrder - b.manualOrder;
-          }
-          return (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0);
+        const svg = tpl.querySelector('.jsbarcode');
+        JsBarcode(svg, o['رقم الطلب'], { format:"CODE128", height:50, width:2, displayValue:false, margin:0 });
+        tpl.querySelector('[data-barcode-text]').textContent = o['رقم الطلب'];
+        new QRCode(tpl.querySelector('[data-qr]'), {
+          text: o['رقم الطلب'], width:100, height:100, correctLevel: QRCode.CorrectLevel.H
         });
-        setOrders(fetchedOrders);
-        setLoading(false);
-      }, (error) => {
-        console.error("Error fetching orders:", error);
-        setLoading(false);
-        displayMessage("حدث خطأ أثناء تحميل الطلبات.", "error");
+        win.document.body.appendChild(tpl);
       });
-
-      return () => unsubscribe();
-    } else if (!isAuthReady) {
-      setLoading(true);
-    } else {
-      setLoading(false);
-      console.warn("Firestore not available or user not authenticated. Orders will not be loaded/saved.");
+      win.document.write('</body></html>');
+      win.document.close();
+      setTimeout(()=>win.print(),300);
     }
-  }, [db, userId, isAuthReady, appId, displayMessage]);
 
-  // Apply filters and search
-  useEffect(() => {
-    let currentList = orders.slice();
-    if (filterStatus) {
-      currentList = currentList.filter(o => o.status === filterStatus);
-    }
-    if (searchQuery) {
-      currentList = currentList.filter(o =>
-        o.orderId?.toString().toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.customerName?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    setFilteredOrders(currentList);
-  }, [orders, filterStatus, searchQuery]);
+    // إضافة طلب جديد
+    document.getElementById('addOrderBtn').addEventListener('click', ()=> {
+      document.getElementById('addOrderForm').reset();
+      new bootstrap.Modal(document.getElementById('addOrderModal')).show();
+    });
+    document.getElementById('addOrderForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(this).entries());
+      orders.push({...data, status:'قيد الانتظار', manualOrder:null});
+      save(); render();
+      bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+    });
 
-  // SortableJS initialization
-  useEffect(() => {
-    // Ensure Sortable is available before initializing
-    if (ordersContainerRef.current && typeof window.Sortable !== 'undefined' && typeof window.Sortable.create === 'function' && areLibrariesReady) {
-      if (sortableInstance.current) {
-        sortableInstance.current.destroy();
+    // تحرير الطلب
+    function editOrder(o){
+      document.getElementById('addOrderForm').reset();
+      for(const k in o){
+        if(document.querySelector('#addOrderForm [name="'+k+'"]'))
+          document.querySelector('#addOrderForm [name="'+k+'"]').value = o[k];
       }
-      sortableInstance.current = window.Sortable.create(ordersContainerRef.current, {
-        animation: 150,
-        disabled: !isSortableEnabled,
-        onEnd: async (evt) => {
-          const newOrderIds = Array.from(evt.to.children).map(child => child.getAttribute('data-id'));
-          const reorderedOrders = newOrderIds.map(id => orders.find(o => o.id === id));
+      new bootstrap.Modal(document.getElementById('addOrderModal')).show();
+      document.getElementById('addOrderForm').onsubmit = function(e){
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(this).entries());
+        Object.assign(o, data);
+        save(); render();
+        bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+        this.onsubmit = null;
+      }
+    }
 
-          const updatedOrders = reorderedOrders.map((order, index) => ({
-            ...order,
-            manualOrder: index + 1
-          }));
+    // حذف المحدد
+    document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card,.order-list-row').getAttribute('data-id'));
+      if(ids.length && confirm('تأكيد حذف الطلبات المحددة؟')){
+        orders = orders.filter(x=>!ids.includes(x['رقم الطلب'].toString()));
+        save(); render();
+      }
+    });
 
-          setOrders(updatedOrders); // Optimistic update
+    // تغيير حالة مجموعة
+    document.getElementById('bulkStatus').addEventListener('change', function(){
+      if(!this.value) return;
+      const ids = Array.from(document.querySelectorAll('.select-label:checked'))
+        .map(cb=>cb.closest('.order-card,.order-list-row').getAttribute('data-id'));
+      if(!ids.length) return alert('حدد طلبات أولاً');
+      orders.forEach(x=>{ if(ids.includes(x['رقم الطلب'].toString())) x.status = this.value; });
+      save(); render();
+      this.selectedIndex = 0;
+    });
 
-          if (db && userId) {
-            try {
-              const batch = getFirestore().batch(); 
-              updatedOrders.forEach((order) => {
-                const docRef = doc(db, `artifacts/${appId}/users/${userId}/delivery_orders`, order.id);
-                batch.update(docRef, { manualOrder: order.manualOrder });
-              });
-              await batch.commit();
-              displayMessage("تم تحديث ترتيب الطلبات يدويًا بنجاح.", "success");
-            } catch (error) {
-              console.error("Error batch updating manual order numbers:", error);
-              displayMessage("حدث خطأ أثناء تحديث الترتيب اليدوي في قاعدة البيانات.", "error");
-              setOrders(orders); // Revert to original orders if batch update fails
+    // تصدير Excel
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      if(!orders.length) return alert('لا توجد بيانات للتصدير');
+      const data = orders.map(o=>({
+        'رقم الطلب':o['رقم الطلب'],'اسم العميل':o['اسم العميل'],'رقم الجوال':o['رقم الجوال'],
+        'عنوان العميل':o['عنوان العميل'],'طريقة الدفع':o['طريقة الدفع'],'إجمالي الطلب':o['إجمالي الطلب'],
+        'ملاحظة':o['ملاحظة']||'','الحالة':o.status,'الترتيب اليدوي':o.manualOrder||''
+      }));
+      const ws=XLSX.utils.json_to_sheet(data), wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'Orders');
+      XLSX.writeFile(wb,'Orders_export.xlsx');
+    });
+
+    // رفع ملف
+    document.getElementById('fileInput').addEventListener('change', function(){
+      const f=this.files[0]; if(!f) return;
+      const r=new FileReader(); r.onload=evt=>{
+        const wb=XLSX.read(evt.target.result,{type:'binary'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        let newOrders = XLSX.utils.sheet_to_json(ws,{defval:''})
+          .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
+        // دمج مع الطلبات الحالية
+        orders = orders.concat(newOrders);
+        save(); render();
+      }; r.readAsBinaryString(f);
+    });
+
+    // البحث
+    document.getElementById('searchInput').addEventListener('input', render);
+
+    // الفلاتر
+    document.querySelectorAll('.status-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      filterStatus = btn.getAttribute('data-status');
+      render();
+    }));
+
+    // الترتيب اليدوي
+    document.getElementById('manualSortBtn').addEventListener('click', ()=>{
+      sortable.option('disabled',!sortable.option('disabled'));
+      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
+    });
+
+    // تطبيق الترقيم
+    document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
+      orders.forEach((o,i)=>o.manualOrder=i+1);
+      save(); render();
+    });
+
+    // تحديد الكل
+    document.getElementById('selectAllBtn').addEventListener('click', ()=>{
+      const boxes=Array.from(document.querySelectorAll('.select-label'));
+      const anyUnchecked=boxes.some(cb=>!cb.checked);
+      boxes.forEach(cb=>cb.checked=anyUnchecked);
+    });
+
+    // طباعة
+    document.getElementById('printSelectedBtn').addEventListener('click', printSelectedLabels);
+
+    // مسح الكل
+    document.getElementById('clearStorage').addEventListener('click', ()=>{
+      if(confirm('سيتم مسح جميع الطلبات!')){
+        localStorage.removeItem('ordersData'); orders=[]; render();
+      }
+    });
+
+    // تراجع/تقدم
+    document.getElementById('undoBtn').addEventListener('click', ()=>{
+      if(history.length>1){
+        future.push(history.pop());
+        orders = JSON.parse(history[history.length-1]);
+        localStorage.setItem('ordersData', history[history.length-1]);
+        render();
+      }
+    });
+    document.getElementById('redoBtn').addEventListener('click', ()=>{
+      if(future.length){
+        const f = future.pop();
+        history.push(f);
+        orders = JSON.parse(f);
+        localStorage.setItem('ordersData', f);
+        render();
+      }
+    });
+
+    // تبديل نوع العرض
+    document.getElementById('viewSwitchBtn').addEventListener('click', ()=>{
+      viewType = (viewType==='grid'?'list':'grid');
+      document.getElementById('viewTypeLabel').textContent = viewType==='grid'?'شبكة':'قائمة';
+      render();
+    });
+
+    // إدخال رقم عبر الماسح الضوئي
+    document.getElementById('scannerInput').addEventListener('keydown', function(e){
+      if(e.key === "Enter"){
+        const val = this.value.trim();
+        if(val){
+          const idx = orders.findIndex(x => (x['رقم الطلب'] || '').toString() === val);
+          const soundSuccess = document.getElementById('sound-success');
+          const soundError = document.getElementById('sound-error');
+          if(idx !== -1){
+            if (orders[idx].status === 'قيد الانتظار') {
+              orders[idx].status = 'جاري التوصيل';
+              save(); render();
+              soundSuccess?.play();
+            } else {
+              soundError?.play();
             }
+            document.querySelectorAll('.order-card,.order-list-row')[idx]?.scrollIntoView({behavior:'smooth'});
+            document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.add('table-primary');
+            setTimeout(() => document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.remove('table-primary'), 2000);
+          } else {
+            soundError?.play();
           }
-        },
-      });
-    }
-
-    return () => {
-      if (sortableInstance.current) {
-        sortableInstance.current.destroy();
-        sortableInstance.current = null;
+          this.value = '';
+        }
       }
-    };
-  }, [orders, isSortableEnabled, db, userId, appId, displayMessage, areLibrariesReady]);
+    });
 
-  return (
-    <>
-      <AppHeader userId={userId} />
-      {/* Pass orders, updateOrderStatus, displayMessage, and playSound to ScannerInput */}
-      <ScannerInput
-        orders={orders}
-        updateOrderStatus={updateOrderStatus}
-        displayMessage={displayMessage}
-        playSound={playSound}
-      />
-      
-      {/* New button to toggle controls visibility */}
-      <div className="w-full text-center mb-8">
-        <button
-          onClick={toggleControlsVisibility}
-          className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center mx-auto"
-        >
-          <i className={`bi ${showControls ? 'bi-eye-slash-fill' : 'bi-eye-fill'} ml-2`}></i>
-          {showControls ? 'إخفاء لوحة التحكم' : 'إظهار لوحة التحكم'}
-        </button>
-      </div>
+    // تحميل تلقائي
+    window.addEventListener('load', load);
 
-      {loading ? (
-        <div className="text-center py-10">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">جاري تحميل الطلبات...</p>
-        </div>
-      ) : (
-        <>
-          {/* Order Management Controls - Always at the top when visible */}
-          {showControls && (
-            <OrderManagementControls
-              handleFileUpload={handleFileUpload}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              isSortableEnabled={isSortableEnabled}
-              setIsSortableEnabled={setIsSortableEnabled}
-              handleApplyManualNumberSort={handleApplyManualNumberSort}
-              handleExportExcel={handleExportExcel}
-              handleSelectAll={handleSelectAll}
-              printSelectedLabels={printSelectedLabels}
-              resetOrderToOriginal={resetOrderToOriginal}
-              handleClearAllData={handleClearAllData}
-              displayMessage={displayMessage}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              selectedOrderIds={selectedOrderIds}
-              handleBulkStatusUpdate={handleBulkStatusUpdate}
-              bulkUpdateStatus={bulkUpdateStatus}
-              setBulkUpdateStatus={setBulkUpdateStatus}
-              openAddOrderModal={() => setShowAddOrderModal(true)}
-              areLibrariesReady={areLibrariesReady}
-            />
-          )}
-
-          {/* Filter Status Section - Now with horizontal scrolling, and a contained width */}
-          <div className="flex flex-col items-center w-full max-w-4xl px-4 py-4 bg-gray-50 rounded-lg shadow-inner mb-6">
-            <h3 className="text-xl font-semibold text-gray-700 mb-3 w-full text-right">فلترة حسب الحالة:</h3>
-            {/* Added max-w-full and overflow-hidden to the parent div */}
-            <div className="flex flex-row-reverse overflow-x-auto pb-2 space-x-2 space-x-reverse custom-scrollbar w-full"> {/* Added w-full */}
-              {['', ...ORDER_STATUSES].map(status => (
-                <button
-                  key={status}
-                  onClick={() => setFilterStatus(status)}
-                  className={`flex-shrink-0 py-2 px-5 rounded-full transition-colors duration-200 shadow-sm text-sm font-semibold transform hover:scale-105 whitespace-nowrap ${filterStatus === status ? 'bg-blue-700 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                >
-                  {status === '' ? 'الكل' : status}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <OrderGridDisplay
-            orders={filteredOrders}
-            updateOrderStatus={updateOrderStatus}
-            deleteOrder={deleteOrder}
-            generateLabel={generateLabel}
-            updateOrderManualNumber={updateOrderManualNumber}
-            ordersContainerRef={ordersContainerRef}
-            viewMode={viewMode}
-            onOpenMessageGenerator={handleOpenMessageGenerator} // Pass LLM message generator handler
-            onSelectOrder={handleSelectOrder}
-            selectedOrderIds={selectedOrderIds}
-          />
-        </>
-      )}
-
-      {showAddOrderModal && (
-        <AddOrderModal addOrder={addOrder} onClose={() => setShowAddOrderModal(false)} />
-      )}
-
-      {showLLMMessageModal && selectedOrderForLLM && (
-        <MessageGeneratorModal
-          order={selectedOrderForLLM}
-          onClose={handleCloseLLMMessageModal}
-        />
-      )}
-
-      {showMessageBox && (
-        <MessageBox
-          message={message}
-          type={messageType}
-          onClose={handleCloseMessageBox}
-          onConfirm={messageType === 'confirm' ? handleConfirmAction : null}
-        />
-      )}
-    </>
-  );
-};
-
-// Main App component (wrapper for FirebaseProvider and global styles)
-export default function App() {
-  return (
-    <FirebaseProvider>
-      <div className="min-h-screen bg-gray-100 font-sans text-gray-900 p-6 flex flex-col items-center">
-        {/* Global Styles */}
-        <style>
-          {`
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-            body { 
-              font-family: 'Inter', sans-serif; 
-              direction: rtl; 
-              overflow-x: hidden; /* Prevent horizontal scrolling of the entire page */
-            }
-            input[type="tel"], input[type="text"][dir="ltr"], input[type="number"] { direction: ltr; }
-
-            /* Animations */
-            @keyframes fadeInDown {
-              from { opacity: 0; transform: translateY(-20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes fadeInUp {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-down { animation: fadeInDown 0.6s ease-out; }
-            .animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
-
-            /* Custom print styles for label template */
-            @page { size:95mm 145mm; margin:0; }
-            body { margin:0; padding:0; }
-            .label {
-              width:95mm;
-              height:145mm;
-              padding:3mm;
-              box-sizing:border-box;
-              border:2px solid #000;
-              display:flex;
-              flex-direction:column;
-              justify-content:space-between;
-              font-family: 'Inter', sans-serif;
-              break-after: always; /* Ensure each label starts on a new page */
-            }
-            .label:last-child {
-              break-after: auto;
-            }
-            .label-logo {
-              display:block;
-              max-width:40mm;
-              margin:0 auto 2mm;
-              height:auto;
-            }
-            .label .header,
-            .label .codes {
-              display:flex;
-              justify-content:space-between;
-              align-items:center;
-            }
-            .label .codes {
-              margin-top:4mm;
-              gap:3mm;
-            }
-            .label .company-info,
-            .label .info-box {
-              border:1px solid #000;
-              padding:2mm;
-              text-align:right;
-            }
-            .label .info-box {
-              margin:2mm 0;
-              font-weight:500;
-            }
-            .label .info-box .line { margin-bottom:1mm; }
-            .label .cod-box {
-              display:flex;
-              flex-direction:column;
-              width:30mm;
-              height:20mm;
-              text-align:center;
-              border:1px solid #000;
-            }
-            .label .cod-box .title,
-            .label .cod-box .amount {
-              flex:1;
-              line-height:10mm;
-              font-weight:600;
-            }
-            .label .cod-box .amount {
-              background:#000;
-              color:#fff;
-              font-weight:bold;
-            }
-            .label .barcode-wrapper { text-align:center; }
-            .label .barcode-wrapper svg { width:60mm; height:auto; }
-            .label .barcode-text {
-              margin-top:1mm;
-              font-size:12pt;
-              font-weight:bold;
-            }
-            .label .qrcode-area { width:28mm; height:28mm; }
-
-            /* List View Specific Styles */
-            .list-view-item {
-              display: flex;
-              flex-direction: row-reverse; /* RTL layout */
-              align-items: center;
-              justify-content: space-between;
-              padding: 0.75rem 1rem; /* Reduced padding */
-              border: 1px solid #e2e8f0;
-              border-radius: 0.75rem;
-              background-color: #ffffff;
-              box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-            }
-            .list-view-item > div {
-              flex-grow: 1;
-              text-align: right;
-            }
-            .list-view-item .flex-shrink-0 {
-              flex-shrink: 0;
-            }
-            .list-view-item .text-xs {
-                font-size: 0.75rem; /* Further reduce font size for list view */
-            }
-            .list-view-item .text-sm {
-                font-size: 0.875rem; /* Further reduce font size for list view */
-            }
-            .list-view-item .p-1 {
-                padding: 0.25rem; /* Smaller padding for buttons */
-            }
-            .list-view-item .gap-1 {
-                gap: 0.25rem; /* Smaller gap for buttons */
-            }
-            .list-view-item .px-2 {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
-
-            /* Custom scrollbar for filter buttons */
-            .custom-scrollbar::-webkit-scrollbar {
-                height: 6px;
-            }
-            .custom-scrollbar::-webkit-scrollbar-track {
-                background: #f1f1f1;
-                border-radius: 10px;
-            }
-            .custom-scrollbar::-webkit-scrollbar-thumb {
-                background: #888;
-                border-radius: 10px;
-            }
-            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                background: #555;
-            }
-          `}
-        </style>
-        {/* External Libraries loaded globally for direct window access */}
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
-        {/* The scripts are now loaded dynamically within MainAppContent useEffect */}
-        {/* <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script> */}
-        {/* <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script> */}
-        {/* <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script> */}
-        {/* <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script> */}
-        
-        <MainAppContent />
-      </div>
-    </FirebaseProvider>
-  );
-}
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
