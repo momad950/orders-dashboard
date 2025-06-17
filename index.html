@@ -35,10 +35,10 @@
     .order-list-row .form-select, .order-list-row input { font-size:14px; }
     .order-list-row .order-info-list > span { min-width:120px; word-break:break-all;}
     .order-list-row .order-info-list > strong {min-width:80px;}
-    @page { size: 90mm 140mm; margin: 0; }
+    @page { size: 95mm 145mm; margin: 0; }
 
     /* بوليصة الشحن */
-    .label { width:90mm; height:140mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; background:#fff; page-break-after:always;}
+    .label { width:95mm; height:145mm; padding:3mm; box-sizing:border-box; border:2px solid #000; display:flex; flex-direction:column; justify-content:space-between; background:#fff; page-break-after:always;}
     .label-logo { display:block; max-width:40mm; margin:0 auto 2mm; height:auto; }
     .label .header, .label .codes { display:flex; justify-content:space-between; align-items:center; }
     .label .company-info, .label .info-box { border:1px solid #000; padding:2mm; }
@@ -57,7 +57,7 @@
     /* التأكد من عدم تقطيع البوليصة */
     @media print {
       body { background: #fff !important; }
-      .label { page-break-after: always; page-break-inside: avoid; height: 140mm; overflow: hidden; }
+      .label { page-break-after: always; page-break-inside: avoid; height: 145mm; overflow: hidden; }
       .label:last-child { page-break-after: auto; }
       .container, .header, .controls, .status-filters { display:none !important; }
       #ordersContainer { margin:0 !important; }
