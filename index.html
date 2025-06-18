@@ -63,6 +63,25 @@
       #ordersContainer { margin:0 !important; }
     }
   </style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  "apiKey": "AIzaSyDSCaJVrFedUkZuCzmyC3I1ln5A7TkuocE",
+  "authDomain": "orders-sync-9e73c.firebaseapp.com",
+  "databaseURL": "https://orders-sync-9e73c-default-rtdb.firebaseio.com",
+  "projectId": "orders-sync-9e73c",
+  "storageBucket": "orders-sync-9e73c.appspot.com",
+  "messagingSenderId": "685651181485",
+  "appId": "1:685651181485:web:d4f6ceb91c47b6376b24",
+  "measurementId": "G-HYD5RCFKQW"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
 </head>
 <body>
 
@@ -185,12 +204,21 @@
     const history = [], future = [];
     
 function syncToSheet() {
-  fetch('https://script.google.com/macros/s/AKfycbwWebfBLqA5IAvREHzRAgFBxmaaacbe2XhGRr7YeTiuqHvjsT05DjNOscE1cV9zmp-uvw/exec', {
-    method: 'POST',
-    body: JSON.stringify(orders),
-    headers: {
+      headers: {
       'Content-Type': 'application/json'
     }
+  });
+}
+
+
+function syncToFirebase() {
+  const updates = {};
+  orders.forEach(o => {
+    const key = o['رقم الطلب'];
+    updates[key] = o;
+  });
+  db.ref("orders").set(updates).then(() => {
+    console.log("✅ Firebase sync complete");
   });
 }
 
@@ -202,9 +230,8 @@ function syncToSheet() {
 
     // حفظ واستعادة
     function save() {
-  localStorage.setItem('ordersData', JSON.stringify(orders));
-  history.push(JSON.stringify(orders));
-  syncToSheet();
+  syncToFirebase();
+  
 history.push(JSON.stringify(orders)); }
     function load() {
       const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }
@@ -355,7 +382,26 @@ history.push(JSON.stringify(orders)); }
       });
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصة شحن</title>');
-      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  "apiKey": "AIzaSyDSCaJVrFedUkZuCzmyC3I1ln5A7TkuocE",
+  "authDomain": "orders-sync-9e73c.firebaseapp.com",
+  "databaseURL": "https://orders-sync-9e73c-default-rtdb.firebaseio.com",
+  "projectId": "orders-sync-9e73c",
+  "storageBucket": "orders-sync-9e73c.appspot.com",
+  "messagingSenderId": "685651181485",
+  "appId": "1:685651181485:web:d4f6ceb91c47b6376b24",
+  "measurementId": "G-HYD5RCFKQW"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
+</head><body>');
       win.document.body.appendChild(tpl);
       win.document.close();
       setTimeout(()=>win.print(),300);
@@ -368,7 +414,26 @@ history.push(JSON.stringify(orders)); }
       if(!ids.length) return alert('لم تختَر أي طلبات للطباعة.');
       const win = window.open('','_blank');
       win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>بوليصات شحن</title>');
-      win.document.write('<style>'+document.querySelector('style').innerText+'</style></head><body>');
+      win.document.write('<style>'+document.querySelector('style').innerText+'</style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  "apiKey": "AIzaSyDSCaJVrFedUkZuCzmyC3I1ln5A7TkuocE",
+  "authDomain": "orders-sync-9e73c.firebaseapp.com",
+  "databaseURL": "https://orders-sync-9e73c-default-rtdb.firebaseio.com",
+  "projectId": "orders-sync-9e73c",
+  "storageBucket": "orders-sync-9e73c.appspot.com",
+  "messagingSenderId": "685651181485",
+  "appId": "1:685651181485:web:d4f6ceb91c47b6376b24",
+  "measurementId": "G-HYD5RCFKQW"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
+</head><body>');
       ids.forEach(id=>{
         const o = orders.find(x=>x['رقم الطلب'].toString()===id);
         const tpl = document.getElementById('labelTemplate').content.cloneNode(true);
@@ -536,8 +601,7 @@ orders = orders.concat(uniqueOrders);
       if(history.length>1){
         future.push(history.pop());
         orders = JSON.parse(history[history.length-1]);
-        localStorage.setItem('ordersData', history[history.length-1]);
-        render();
+                render();
       }
     });
     document.getElementById('redoBtn').addEventListener('click', ()=>{
@@ -545,8 +609,7 @@ orders = orders.concat(uniqueOrders);
         const f = future.pop();
         history.push(f);
         orders = JSON.parse(f);
-        localStorage.setItem('ordersData', f);
-        render();
+                render();
       }
     });
 
@@ -587,10 +650,21 @@ orders = orders.concat(uniqueOrders);
     // تحميل تلقائي
 
 window.addEventListener('load', () => {
-  fetch('https://script.google.com/macros/s/AKfycbwWebfBLqA5IAvREHzRAgFBxmaaacbe2XhGRr7YeTiuqHvjsT05DjNOscE1cV9zmp-uvw/exec')
-    .then(res => res.json())
-    .then(data => {
-      orders = data.map(o => ({
+  db.ref("orders").once("value").then(snapshot => {
+    const data = snapshot.val() || {};
+    orders = Object.values(data).map(o => ({
+      ...o,
+      manualOrder: parseInt(o["الترتيب اليدوي"]) || null,
+      status: o["الحالة"] || "قيد الانتظار"
+    }));
+    render();
+    console.log("✅ Loaded orders from Firebase");
+  });
+});
+
+
+window.addEventListener('load', () => {
+        orders = data.map(o => ({
         ...o,
         manualOrder: parseInt(o['الترتيب اليدوي']) || null,
         status: o['الحالة'] || 'قيد الانتظار'
@@ -609,7 +683,7 @@ window.addEventListener('load', () => {
 
 <script>
 document.getElementById('syncNowBtn')?.addEventListener('click', () => {
-  syncToSheet();
+  
   const now = new Date();
   document.getElementById('syncTime').textContent = "آخر مزامنة: " + now.toLocaleString();
 });
