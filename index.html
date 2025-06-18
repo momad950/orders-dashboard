@@ -384,7 +384,11 @@
     document.getElementById('addOrderForm').addEventListener('submit', function(e){
       e.preventDefault();
       const data = Object.fromEntries(new FormData(this).entries());
-      orders.push({...data, status:'قيد الانتظار', manualOrder:null});
+      if (orders.some(o => o['رقم الطلب'] == data['رقم الطلب'])) {
+  alert('لا يمكن إضافة الطلب: الرقم مكرر بالفعل!');
+  return;
+}
+orders.push({...data, status:'قيد الانتظار', manualOrder:null});
       save(); render();
       bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
     });
@@ -400,7 +404,11 @@
       document.getElementById('addOrderForm').onsubmit = function(e){
         e.preventDefault();
         const data = Object.fromEntries(new FormData(this).entries());
-        Object.assign(o, data);
+        if (orders.some(x => x !== o && x['رقم الطلب'] == data['رقم الطلب'])) {
+  alert('لا يمكن تعديل الطلب: الرقم مستخدم بالفعل في طلب آخر!');
+  return;
+}
+Object.assign(o, data);
         save(); render();
         bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
         this.onsubmit = null;
@@ -450,7 +458,15 @@
         let newOrders = XLSX.utils.sheet_to_json(ws,{defval:''})
           .map(r=>({...r, status:'قيد الانتظار', manualOrder:null}));
         // دمج مع الطلبات الحالية
-        orders = orders.concat(newOrders);
+        const uniqueOrders = newOrders.filter(newO => !orders.some(o => o['رقم الطلب'] == newO['رقم الطلب']));
+if (uniqueOrders.length < newOrders.length) {
+  alert('تم تجاهل بعض الطلبات المكررة عند رفع الملف.');
+}
+if (uniqueOrders.length < newOrders.length) {
+  const duplicates = newOrders.filter(newO => orders.some(o => o['رقم الطلب'] == newO['رقم الطلب'])).map(o => o['رقم الطلب']);
+  alert('تم تجاهل الطلبات التالية بسبب التكرار:\n' + duplicates.join(', '));
+}
+orders = orders.concat(uniqueOrders);
         save(); render();
       }; r.readAsBinaryString(f);
     });
