@@ -253,7 +253,7 @@
             }
           });
         });
-        if(!sortable) initSortable();
+        if(!sortable) initSortable(); sortable.option('disabled', true);
       } else {
         cont.className = '';
         list.forEach((o,i)=>{
@@ -484,9 +484,11 @@ orders = orders.concat(uniqueOrders);
 
     // الترتيب اليدوي
     document.getElementById('manualSortBtn').addEventListener('click', ()=>{
-      sortable.option('disabled',!sortable.option('disabled'));
-      document.getElementById('manualSortBtn').textContent = sortable.option('disabled')?'تمكين الترتيب اليدوي':'تعطيل الترتيب اليدوي';
-    });
+  const btn = document.getElementById('manualSortBtn');
+  const isDisabled = sortable.option('disabled');
+  sortable.option('disabled', !isDisabled);
+  btn.textContent = isDisabled ? 'تعطيل الترتيب اليدوي' : 'تمكين الترتيب اليدوي';
+});
 
     // تطبيق الترقيم
     document.getElementById('applyNumberBtn').addEventListener('click', ()=>{
@@ -553,9 +555,9 @@ orders = orders.concat(uniqueOrders);
             } else {
               soundError?.play();
             }
-            document.querySelectorAll('.order-card,.order-list-row')[idx]?.scrollIntoView({behavior:'smooth'});
-            document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.add('table-primary');
-            setTimeout(() => document.querySelectorAll('.order-card,.order-list-row')[idx]?.classList.remove('table-primary'), 2000);
+            
+            classList.add('table-primary');
+            setTimeout(() => classList.remove('table-primary'), 2000);
           } else {
             soundError?.play();
           }
