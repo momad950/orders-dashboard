@@ -144,7 +144,7 @@
     </div>
     <div class="row controls">
   <button id="syncNowBtn" class="btn btn-outline-dark btn-sm col-auto">🔄 مزامنة الآن</button>
-<div id="syncTime" class="text-muted small mt-1 ms-2"></div>
+  <div id="syncTime" class="text-muted small mt-2"></div>
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
       <button id="addOrderBtn" class="btn btn-warning btn-sm col-auto">إضافة طلب جديد</button>
@@ -610,7 +610,6 @@ window.addEventListener('load', () => {
 <script>
 document.getElementById('syncNowBtn')?.addEventListener('click', () => {
   syncToSheet();
-  alert("✅ تمت المزامنة اليدوية مع Google Sheets";
   const now = new Date();
   document.getElementById('syncTime').textContent = "آخر مزامنة: " + now.toLocaleString();
 });
