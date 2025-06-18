@@ -143,6 +143,8 @@
       <input id="scannerInput" class="form-control scanner-input" placeholder="امسح رقم الطلب هنا" autofocus>
     </div>
     <div class="row controls">
+  <button id="syncNowBtn" class="btn btn-outline-dark btn-sm col-auto">🔄 مزامنة الآن</button>
+<div id="syncTime" class="text-muted small mt-1 ms-2"></div>
       <input id="fileInput" class="form-control col-auto" type="file" accept=".xlsx,.xls">
       <input id="searchInput" class="form-control col-auto" placeholder="ابحث برقم الطلب أو اسم العميل">
       <button id="addOrderBtn" class="btn btn-warning btn-sm col-auto">إضافة طلب جديد</button>
@@ -181,14 +183,29 @@
     const cashOnDelivery = 'الدفع عند الاستلام';
     const statuses = ['قيد الانتظار','جاري التوصيل','تم التوصيل','مؤجل','مرفوض'];
     const history = [], future = [];
-    // رسائل واتساب
+    
+function syncToSheet() {
+  fetch('https://script.google.com/macros/s/AKfycbwWebfBLqA5IAvREHzRAgFBxmaaacbe2XhGRr7YeTiuqHvjsT05DjNOscE1cV9zmp-uvw/exec', {
+    method: 'POST',
+    body: JSON.stringify(orders),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+// رسائل واتساب
     const messages = {
       shipping: `السلام عليكم\nأنا مندوب واحة التقنية\nلديك طلبية جاهزة للتوصيل\nأرسل الموقع 📍\nورقم المنزل🏚\nوسيتم التواصل معك قبل التوصيل⏳ 🚗`,
       arrival: `دقيقة تقريبا وبكون في الموقع ان شاءالله\nمناسب؟؟`
     };
 
     // حفظ واستعادة
-    function save() { localStorage.setItem('ordersData', JSON.stringify(orders)); history.push(JSON.stringify(orders)); }
+    function save() {
+  localStorage.setItem('ordersData', JSON.stringify(orders));
+  history.push(JSON.stringify(orders));
+  syncToSheet();
+history.push(JSON.stringify(orders)); }
     function load() {
       const d=localStorage.getItem('ordersData'); if(d){ orders = JSON.parse(d); render(); }
     }
@@ -568,9 +585,33 @@ orders = orders.concat(uniqueOrders);
     });
 
     // تحميل تلقائي
+
+window.addEventListener('load', () => {
+  fetch('https://script.google.com/macros/s/AKfycbwWebfBLqA5IAvREHzRAgFBxmaaacbe2XhGRr7YeTiuqHvjsT05DjNOscE1cV9zmp-uvw/exec')
+    .then(res => res.json())
+    .then(data => {
+      orders = data.map(o => ({
+        ...o,
+        manualOrder: parseInt(o['الترتيب اليدوي']) || null,
+        status: o['الحالة'] || 'قيد الانتظار'
+      }));
+      render();
+      history.push(JSON.stringify(orders));
+    });
+});
+
     window.addEventListener('load', load);
 
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
+<script>
+document.getElementById('syncNowBtn')?.addEventListener('click', () => {
+  syncToSheet();
+  alert("✅ تمت المزامنة اليدوية مع Google Sheets";
+  const now = new Date();
+  document.getElementById('syncTime').textContent = "آخر مزامنة: " + now.toLocaleString();
+});
+</script>
