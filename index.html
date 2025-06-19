@@ -625,12 +625,25 @@ function applyRoleRestrictions() {
       });
     });
   }
+
+  // إذا كنت إدارياً، تأكد من أن خيار "مكتمل" موجود
+  if (role === "admin") {
+    document.querySelectorAll(".status-select").forEach(select => {
+      const exists = [...select.options].some(opt => opt.value === "مكتمل");
+      if (!exists) {
+        const opt = document.createElement("option");
+        opt.value = "مكتمل";
+        opt.textContent = "مكتمل";
+        select.appendChild(opt);
+      }
+    });
+  }
 }
 
-// تأخير التنفيذ إلى ما بعد العرض
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(applyRoleRestrictions, 500);
 });
 </script>
+
 </body>
 </html>
