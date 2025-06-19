@@ -396,6 +396,7 @@ const db = firebase.database();
       e.preventDefault();
       const data = Object.fromEntries(new FormData(this).entries());
       orders.push({...data, status:'قيد الانتظار', manualOrder:null});
+  syncToFirebase();
       save(); render();
       bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
     });
@@ -582,6 +583,7 @@ function loadFromFirebase() {
     const data = snapshot.val();
     if (data) {
       orders = Object.values(data);
+  syncToFirebase(); // لتحديث محلي بعد تحميل
       save();
       render();
     }
