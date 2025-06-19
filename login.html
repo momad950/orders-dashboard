@@ -1,51 +1,24 @@
 
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>تسجيل الدخول - منظم الطلبات</title>
+  <title>تسجيل الدخول - اختيار الدور</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 50px;
-      background-color: #f7f7f7;
-    }
-    h1 {
-      margin-bottom: 40px;
-    }
+    body { font-family: Arial; text-align: center; padding: 50px; background: #f9f9f9; }
+    h1 { margin-bottom: 30px; }
     button {
-      font-size: 18px;
-      padding: 15px 30px;
-      margin: 10px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s;
+      font-size: 18px; padding: 15px 30px; margin: 10px;
+      cursor: pointer; border: none; border-radius: 8px;
+      background-color: #4CAF50; color: white;
+      transition: background-color 0.3s;
     }
-    .admin {
-      background-color: #007bff;
-      color: white;
-    }
-    .agent {
-      background-color: #28a745;
-      color: white;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
+    button:hover { background-color: #45a049; }
   </style>
 </head>
 <body>
   <h1>اختر نوع الدخول</h1>
-  <button class="admin" onclick="goToApp('admin')">الدخول كإداري 👨‍💼</button>
-  <button class="agent" onclick="goToApp('agent')">الدخول كمندوب 🚚</button>
-
-  <script>
-    function goToApp(role) {
-      window.location.href = "index.html?role=" + role;
-    }
-  </script>
+  <button onclick="location.href='index.html?role=admin'">أنا إداري</button>
+  <button onclick="location.href='index.html?role=agent'">أنا مندوب</button>
 </body>
 </html>

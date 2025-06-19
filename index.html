@@ -139,7 +139,7 @@
 <div class="row controls">
 <input accept=".xlsx,.xls" class="form-control col-auto" id="fileInput" type="file"/>
 <input class="form-control col-auto" id="searchInput" placeholder="ابحث برقم الطلب أو اسم العميل"/>
-<button class="btn btn-warning btn-sm col-auto" id="addOrderBtn">إضافة طلب جديد</button>
+<button class="btn btn-warning btn-sm col-auto" id="addOrderBtn">إضافة طلب جديد</button><div class="main-filter" id="main-role-filter" style="margin-top: 15px; margin-bottom: 10px;"></div>
 <button class="btn btn-light btn-sm col-auto" id="undoBtn" title="تراجع"><i class="bi bi-arrow-counterclockwise"></i></button>
 <button class="btn btn-light btn-sm col-auto" id="redoBtn" title="تقدم"><i class="bi bi-arrow-clockwise"></i></button>
 <button class="btn btn-danger btn-sm col-auto" id="deleteSelectedBtn">حذف المحدد</button>
@@ -598,52 +598,48 @@ orders = orders.concat(uniqueOrders);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-const urlParams = new URLSearchParams(window.location.search);
-const role = urlParams.get("role") || "admin";
+document.addEventListener("DOMContentLoaded", function () {
+  const role = new URLSearchParams(window.location.search).get("role") || "admin";
+  const allActiveStatuses = ["قيد الانتظار", "جاري التوصيل", "تم التوصيل", "مؤجل", "مرفوض"];
+  const allInactiveStatuses = ["مكتمل", "ملغي"];
+  const agentStatuses = ["جاري التوصيل", "تم التوصيل", "مؤجل", "مرفوض"];
 
-// مراقبة البطاقات بعد عرضها وتطبيق القيود
-function applyRoleRestrictions() {
-  if (role === "agent") {
-    // إخفاء الطلبات المكتملة
+  const container = document.getElementById("main-role-filter");
+
+  function renderRoleFilter() {
+    if (role !== "admin") return;
+    if (!container) return;
+    container.innerHTML = `
+      <button onclick="filterMain('active')" style="margin-left:5px;">📌 الطلبات النشطة</button>
+      <button onclick="filterMain('inactive')">🗃️ الطلبات غير النشطة</button>
+    `;
+  }
+
+  window.filterMain = function (type) {
+    const allowed = type === "active" ? allActiveStatuses : allInactiveStatuses;
     document.querySelectorAll(".order-card").forEach(card => {
       const status = card.querySelector(".status-select")?.value;
-      if (status === "مكتمل") {
+      card.style.display = allowed.includes(status) ? "" : "none";
+    });
+  };
+
+  function applyAgentFilter() {
+    document.querySelectorAll(".order-card").forEach(card => {
+      const status = card.querySelector(".status-select")?.value;
+      if (!agentStatuses.includes(status)) {
         card.style.display = "none";
       }
     });
-
-    // تعطيل أزرار الحذف والتعديل والطباعة
-    document.querySelectorAll(".btn-edit, .btn-delete, .btn-print").forEach(btn => {
-      btn.style.display = "none";
-    });
-
-    // تقييد الحالات المتاحة
-    document.querySelectorAll(".status-select").forEach(select => {
-      const allowed = ["جاري التوصيل", "تم التوصيل", "مؤجل", "مرفوض"];
-      [...select.options].forEach(opt => {
-        if (!allowed.includes(opt.value)) opt.remove();
-      });
-    });
+    document.querySelectorAll(".filter-buttons, #main-role-filter").forEach(el => el.style.display = "none");
   }
 
-  // إذا كنت إدارياً، تأكد من أن خيار "مكتمل" موجود
   if (role === "admin") {
-    document.querySelectorAll(".status-select").forEach(select => {
-      const exists = [...select.options].some(opt => opt.value === "مكتمل");
-      if (!exists) {
-        const opt = document.createElement("option");
-        opt.value = "مكتمل";
-        opt.textContent = "مكتمل";
-        select.appendChild(opt);
-      }
-    });
+    renderRoleFilter();
+    filterMain("active");
+  } else if (role === "agent") {
+    applyAgentFilter();
   }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  setTimeout(applyRoleRestrictions, 500);
 });
 </script>
-
 </body>
 </html>
