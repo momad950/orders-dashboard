@@ -1,0 +1,51 @@
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>تسجيل الدخول - منظم الطلبات</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
+      background-color: #f7f7f7;
+    }
+    h1 {
+      margin-bottom: 40px;
+    }
+    button {
+      font-size: 18px;
+      padding: 15px 30px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .admin {
+      background-color: #007bff;
+      color: white;
+    }
+    .agent {
+      background-color: #28a745;
+      color: white;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h1>اختر نوع الدخول</h1>
+  <button class="admin" onclick="goToApp('admin')">الدخول كإداري 👨‍💼</button>
+  <button class="agent" onclick="goToApp('agent')">الدخول كمندوب 🚚</button>
+
+  <script>
+    function goToApp(role) {
+      window.location.href = "index.html?role=" + role;
+    }
+  </script>
+</body>
+</html>
